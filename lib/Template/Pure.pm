@@ -82,15 +82,17 @@ sub _render_recursive {
        my ($data_spec, $new_directives) = %$tag;
       my ($new_data_key, $current_key) = split('<-', $data_spec);
       if(my $ele = ($css eq '.' ? $dom : $dom->at($css))) {
-        foreach my $datum (@{ $self->_parse_dataproto($current_key, $data) }) {
+        my $iterator_proto = $self->_parse_dataproto($current_key, $data);
+        my $iterator = Template::Pure::Iterator->from_proto($iterator_proto);
+        while(my $datum = $iterator->next) {
           my $new = DOM::Tiny->new($ele);
           my $new_dom = $self->_render_recursive(
-            +{$new_data_key => $datum},
+            +{$new_data_key => $datum, i => $iterator},
             $new,
             $new_directives);
           $ele->prepend($new_dom);
         }
-        $ele->remove($css);
+        $ele->remove($css); #ugly, but can't find a better solution...
       } else {
         die  "no $css at ${\$dom->to_string}"
       }

@@ -15,9 +15,32 @@ sub from_proto {
   }
 }
 
+sub from_array {
+  my ($class, $arrayref) = @_;
+  my $index = 0;
+  return bless +{
+    _index => sub { return $index },
+    _max_index => sub { return $#{$arrayref} },
+    _count => sub { return scalar @{$arrayref} },
+    _next => sub {
+      my $value = $arrayref->[$index];
+      $index++;
+      return $value;
+    },
+    _peek => sub { return $arrayref->[$index+pop] },
+    _reset => sub { $index = 0 },
+    _all => sub { return @{$arrayref} },
+  }, $class;
+}
+
 sub next {
   my ($self) = @_;
   return $self->{_next}->($self);
+}
+
+sub peek {
+  my ($self, $positions) = @_;
+  return $self->{_peek}->($self, $positions);
 }
 
 sub reset {
@@ -45,8 +68,10 @@ sub index {
   return $self->{_index}->($self);
 }
 
-
-sub max_index {  }
+sub max_index {
+  my ($self) = @_;
+  return $self->{_max_index}->($self);
+}
 
 
 

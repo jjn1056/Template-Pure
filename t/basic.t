@@ -20,7 +20,7 @@ ok my $html_string = qq[
       </ul>
       <a id='return'>Return</a>
       <p id='author'>Example Author</p>
-      <a id='email' href='mailto:'>Email the author at: </a>
+      <a id='email' href='mailto:'>:Is the Author's Email</a>
       <ol id='cite'>
         Citations
         <li>
@@ -41,11 +41,12 @@ ok my %directives = (
   'a#return@href' => 'return_url',
   '#author' => '#{author.first_name} #{author.last_name}',
   '#email@href+' => 'author.email',
-  '#email+' => 'author.email',
+  '+#email' => 'author.email',
   '#copyright' => 'meta.copyright',
   '#cite li' => {
     'cite<-citations' => {
       'span' => 'cite',
+      'span@id' => 'cite_#{i.index}',
     }
    },
   'ul#people li.person' => {
