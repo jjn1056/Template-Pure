@@ -88,11 +88,16 @@ ok my %directives = (
           '@id' => 'friend',
         },
       },
-      'ol#numbers' => {
+      'ol#numbers li' => {
         'number<-person.numbers' => {
           '.' => sub {
             my ($template, $dom, $data) = @_;
-            $dom->attr(class=>'first') if $data->{i}->is_first;
+            my @classes = ();
+            push @classes, 'first' if $data->{i}->is_first;
+            push @classes, 'even' if $data->{i}->is_even;
+            push @classes, 'odd' if $data->{i}->is_odd;
+
+            $dom->attr(class=>join(' ', @classes)) if @classes;
             return  $data->{i}->current_value;
           },
         },

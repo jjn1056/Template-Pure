@@ -48,7 +48,8 @@ sub from_hash {
     _all => sub { return %{$hashref} },
     _is_first => sub { return $index-1 == 0 ? 1:0 },
     _is_last => sub { return $index-1 == $#keys ? 1:0 },
-
+    _is_even => sub { return $index % 2 ? 0:1 },
+    _is_odd => sub { return $index % 2 ? 1:0 },
   }, $class;
 }
 
@@ -83,6 +84,8 @@ sub from_array {
     _all => sub { return @array },
     _is_first => sub { return $index-1 == 0 ? 1:0 },
     _is_last => sub { return $index-1 == $#array ? 1:0 },
+    _is_even => sub { return $index % 2 ? 0:1 },
+    _is_odd => sub { return $index % 2 ? 1:0 },
   }, $class;
 }
 
@@ -128,18 +131,15 @@ sub max_index {
 
 sub is_first { $_[0]->{_is_first}->($_[0]) }
 sub is_last { $_[0]->{_is_last}->($_[0]) }
+sub is_even { $_[0]->{_is_even}->($_[0]) }
+sub is_odd { $_[0]->{_is_odd}->($_[0]) }
 
+sub is_paged { }
 
 sub pager { }
 
 sub page { }
 
 sub is_ordered { }
-
-sub is_even { }
-
-sub is_odd { }
-
-sub is_paged { }
 
 1;
