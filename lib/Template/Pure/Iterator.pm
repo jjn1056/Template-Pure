@@ -15,6 +15,54 @@ sub from_proto {
   }
 }
 
+sub from_object {
+  my ($class, $obj, $sort_cb, $filter_cb) = @_;
+  my ($index, $current) = (0);
+ 
+  if(
+    (my $next = $obj->can('next')) &&
+    (my $all = $obj->can('all')) &&
+    (my $reset = $obj->can('reset')) &&
+    (my $count = $obj->can('count'))
+  ) {
+
+    $obj = $filter_cb->($obj) if defined $filter_cb;
+    $obj = $sort_cb->($obj) if defined $sort_cb;
+
+    return bless +{
+      _index => sub { return $index },
+      _current_value => sub { return $current },
+      _max_index => sub { return $count->() - 1 },
+      _count => sub { return $count->() },
+      _next => sub {
+        if(my $next = $next->()) {
+          $current = $next;
+          $index++;
+          return $next;
+        } else {
+          return undef;
+        }
+      },
+      _reset => sub { $reset->() },
+      _all => sub { return $all->() },
+      _is_first => sub { return $index-1 == 0 ? 1:0 },
+      _is_last => sub { return $index == $count->() ? 1:0 },
+      _is_even => sub { return $index % 2 ? 0:1 },
+      _is_odd => sub { return $index % 2 ? 1:0 },
+    }, $class;
+  } else {
+    my %hash;
+    if(my $fields = $obj->can('display_fields')) {
+      %hash = map { $_ => $obj->$_ } ($fields->());
+    } else {
+      %hash =  %{$obj};
+    }
+
+    return $class->from_hash(\%hash, $sort_cb, $filter_cb);
+  }
+
+}
+
 sub from_hash {
   my ($class, $hashref, $sort_cb, $filter_cb) = @_;
   my @keys = defined $filter_cb ? grep { $filter_cb->($_, $hashref->{$_}) ? $_ : undef } keys %$hashref : keys %$hashref;
@@ -38,11 +86,6 @@ sub from_hash {
       $index++;
       $current = $value;
       return $value;
-    },
-    _peek => sub {
-      my ($self, $positions) = @_;
-      $positions = 0 unless defined($positions);
-      return $hashref->{ $keys[$index + $positions] };
     },
     _reset => sub { $index = 0 },
     _all => sub { return %{$hashref} },
@@ -75,11 +118,6 @@ sub from_array {
       $current = $value;
       return $value;
     },
-    _peek => sub {
-      my ($self, $positions) = @_;
-      $positions = 0 unless defined($positions);
-      return $array[$index+ $positions];
-    },
     _reset => sub { $index = 0 },
     _all => sub { return @array },
     _is_first => sub { return $index-1 == 0 ? 1:0 },
@@ -97,11 +135,6 @@ sub current_value {
 sub next {
   my ($self) = @_;
   return $self->{_next}->($self);
-}
-
-sub peek {
-  my ($self, $positions) = @_;
-  return $self->{_peek}->($self, $positions);
 }
 
 sub reset {
