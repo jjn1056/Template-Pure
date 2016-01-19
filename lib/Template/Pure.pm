@@ -37,6 +37,7 @@ sub _parse_match_spec {
 
 sub _parse_dataproto {
   my ($self, $tag, $data, $ele) = @_;
+  die "Missing tag" unless defined $tag;
   if((ref($tag)||'') eq 'CODE') {
     return $self->_call_codetag($tag, $ele, $data);
   } elsif(my @placeholders = ($tag=~m/(#{.+?})/g)) {
@@ -78,12 +79,15 @@ sub _render_recursive {
   foreach my $match (keys %$directives) {
     my ($css, $maybe_attr, $maybe_prepend, $maybe_append) = $self->_parse_match_spec($match);
     my $tag = $directives->{$match};
+    die "no match for $match in ". Dumper $directives unless defined $tag;
     if(ref($tag) && ref($tag) eq 'HASH') {
-       my ($data_spec, $new_directives) = %$tag;
+      my $sort_cb = delete $tag->{sort};
+      my $filter_cb = delete $tag->{filter};
+      my ($data_spec, $new_directives) = %$tag;
       my ($new_data_key, $current_key) = split('<-', $data_spec);
       if(my $ele = ($css eq '.' ? $dom : $dom->at($css))) {
-        my $iterator_proto = $self->_parse_dataproto($current_key, $data);
-        my $iterator = Template::Pure::Iterator->from_proto($iterator_proto);
+        my $iterator_proto = $self->_parse_dataproto($current_key, $data, $ele);
+        my $iterator = Template::Pure::Iterator->from_proto($iterator_proto, $sort_cb, $filter_cb);
         while(my $datum = $iterator->next) {
           my $new = DOM::Tiny->new($ele);
           my $new_dom = $self->_render_recursive(

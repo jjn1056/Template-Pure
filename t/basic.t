@@ -8,6 +8,10 @@ ok my $html_string = qq[
     </head>
     <body>
       <h1 id='headline'>Example Headline</h1>
+      <dl id='dlist'>
+        <dt>property</dt>
+        <dd>value</dd>
+      </dl>
       <ul id='people'>
         <li class='person'>
           <span>Jane Grey</span>:<span class="age">11</span>
@@ -16,6 +20,9 @@ ok my $html_string = qq[
               James Grey
             </li>
           </ul>
+          <ol id="numbers">
+            <li>(646)-708-1837</li>
+          </ol>
         </li>
       </ul>
       <a id='return'>Return</a>
@@ -38,6 +45,20 @@ ok my %directives = (
     my ($template, $dom, $data) = @_;
     return $template->data_at_path($data, 'random_stuff');
   },
+  'dl#dlist' => {
+    'property<-author' => {
+      'dt' => 'i.index',
+      'dd' => 'property',
+    },
+    'sort' => sub {
+      my ($data, $a, $b) = @_;
+      return lc($data->{$a}) cmp lc($data->{$b});
+    },
+    'filter' => sub {
+      my ($key, $value) = @_;
+      return $key =~m/_name/i;
+    }
+  },
   'a#return@href' => 'return_url',
   '#author' => '#{author.first_name} #{author.last_name}',
   '#email@href+' => 'author.email',
@@ -47,8 +68,16 @@ ok my %directives = (
     'cite<-citations' => {
       'span' => 'cite',
       'span@id' => 'cite_#{i.index}',
-    }
-   },
+    },
+    'sort' => sub {
+      my ($arrayref, $a, $b) = @_;
+      return $b cmp $a;
+    },
+    'filter' => sub {
+      my $value = shift;
+      return $value !~m/d/;
+    },
+  },
   'ul#people li.person' => {
     'person<-people' => {
       'span' => 'person.name',
@@ -57,6 +86,15 @@ ok my %directives = (
         'friend<-person.friends' => {
           '.' => 'friend',
           '@id' => 'friend',
+        },
+      },
+      'ol#numbers' => {
+        'number<-person.numbers' => {
+          '.' => sub {
+            my ($template, $dom, $data) = @_;
+            $dom->attr(class=>'first') if $data->{i}->is_first;
+            return  $data->{i}->current_value;
+          },
         },
       }
     },
@@ -82,8 +120,8 @@ ok my %data = (
   },
   citations => [qw/aa bb cc dd/],
   people => [
-    { name => 'john Doe', age => 25, friends => [qw/Mark Mary Joe Jack Jason/] },
-    { name => 'Bill On', age => 45, friends =>[qw/Srivinas Milton Aubrey/]}]);
+    { name => 'john Doe', age => 25, numbers => [qw/10 20 25/], friends => [qw/Mark Mary Joe Jack Jason/] },
+    { name => 'Bill On', age => 45, numbers => [qw/35 42/], friends =>[qw/Srivinas Milton Aubrey/]}]);
 
 ok my $rendered_template = $pure->render(\%data);
 

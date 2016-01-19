@@ -6,31 +6,89 @@ package Template::Pure::Iterator;
 use Scalar::Util 'blessed';
 
 sub from_proto {
-  my ($class, $proto) = @_;
+  my ($class, $proto, $sort_cb, $filter_cb) = @_;
   if(blessed $proto) {
-    return $class->from_object($proto);
+    return $class->from_object($proto, $sort_cb, $filter_cb);
   } else {
     my $type = 'from_' .lc ref $proto;
-    return $class->$type($proto);
+    return $class->$type($proto, $sort_cb, $filter_cb);
   }
 }
 
-sub from_array {
-  my ($class, $arrayref) = @_;
+sub from_hash {
+  my ($class, $hashref, $sort_cb, $filter_cb) = @_;
+  my @keys = defined $filter_cb ? grep { $filter_cb->($_, $hashref->{$_}) ? $_ : undef } keys %$hashref : keys %$hashref;
+
+  if(defined $sort_cb) {
+    @keys = sort { $sort_cb->($hashref, $a, $b) } @keys;
+  }
+
   my $index = 0;
+  my $current;
+  my $current_key = $hashref->{$keys[0]};
   return bless +{
-    _index => sub { return $index },
-    _max_index => sub { return $#{$arrayref} },
-    _count => sub { return scalar @{$arrayref} },
+    _index => sub { return $current_key },
+    _current_value => sub { return $current },
+    _max_index => sub { return undef; },
+    _count => sub { return scalar @keys },
     _next => sub {
-      my $value = $arrayref->[$index];
+      return undef if $index > $#keys;
+      $current_key = $keys[$index];
+      my $value = $hashref->{$current_key};
       $index++;
+      $current = $value;
       return $value;
     },
-    _peek => sub { return $arrayref->[$index+pop] },
+    _peek => sub {
+      my ($self, $positions) = @_;
+      $positions = 0 unless defined($positions);
+      return $hashref->{ $keys[$index + $positions] };
+    },
     _reset => sub { $index = 0 },
-    _all => sub { return @{$arrayref} },
+    _all => sub { return %{$hashref} },
+    _is_first => sub { return $index-1 == 0 ? 1:0 },
+    _is_last => sub { return $index-1 == $#keys ? 1:0 },
+
   }, $class;
+}
+
+sub from_array {
+  my ($class, $arrayref, $sort_cb, $filter_cb) = @_;
+  my @array = defined $filter_cb ? grep { $filter_cb->($_) } @$arrayref : @$arrayref;
+
+  if(defined $sort_cb) {
+    @array = sort { $sort_cb->($arrayref, $a, $b) } @array;
+  }
+
+  my $index = 0;
+  my $current;
+  return bless +{
+    _index => sub { return $index },
+    _current_value => sub { return $current },
+    _max_index => sub { return $#array },
+    _count => sub { return scalar @array },
+    _next => sub {
+      return undef if $index > $#array;
+      my $value = $array[$index];
+      $index++;
+      $current = $value;
+      return $value;
+    },
+    _peek => sub {
+      my ($self, $positions) = @_;
+      $positions = 0 unless defined($positions);
+      return $array[$index+ $positions];
+    },
+    _reset => sub { $index = 0 },
+    _all => sub { return @array },
+    _is_first => sub { return $index-1 == 0 ? 1:0 },
+    _is_last => sub { return $index-1 == $#array ? 1:0 },
+  }, $class;
+}
+
+sub current_value {
+  my ($self) = @_;
+  return $self->{_current_value}->($self);
 }
 
 sub next {
@@ -58,11 +116,6 @@ sub count {
   return $self->{_count}->($self);
 }
 
-sub slice {
-  my ($self) = @_;
-  return $self->{_slice}->($self);
-}
-
 sub index {
   my ($self) = @_;
   return $self->{_index}->($self);
@@ -73,21 +126,15 @@ sub max_index {
   return $self->{_max_index}->($self);
 }
 
+sub is_first { $_[0]->{_is_first}->($_[0]) }
+sub is_last { $_[0]->{_is_last}->($_[0]) }
 
 
 sub pager { }
 
 sub page { }
 
-sub apply_sorting { }
-
-sub apply_filter { }
-
 sub is_ordered { }
-
-sub is_first { }
-
-sub is_last { }
 
 sub is_even { }
 
