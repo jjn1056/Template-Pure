@@ -5,6 +5,7 @@ package Template::Pure;
 
 use DOM::Tiny;
 use Template::Pure::Iterator;
+use Template::Pure::EncodedString;
 use Scalar::Util 'blessed';
 use Data::Dumper;
 use Devel::Dwarn;
@@ -13,10 +14,28 @@ sub new {
   my ($proto, %args) = @_;
   my $class = ref($proto) || $proto;
   my %attr = (
+    filters => {
+      uc => sub { uc shift },
+      lc => sub { lc shift },
+      ltrim => sub { my $s = shift; $s =~ s/^\s+//; return $s },
+      rtrim => sub { my $s = shift; $s =~ s/\s+$//; return $s },
+      trim => sub { my $s = shift; $s =~ s/^\s+|\s+$//g; return $s },
+      escape_html => sub {
+        my %_escape_table = ( '&' => '&amp;', '>' => '&gt;', '<' => '&lt;', q{"} => '&quot;', q{'} => '&#39;' );
+        my $s = shift;
+        return $s if blessed $s && $s->isa('Template::Pure::EncodedString');
+        $s =~ s/([&><"'])/$_escape_table{$1}/ge; 
+        return $s;
+      },
+    },
     dom => DOM::Tiny->new($args{template}),
     directives => $args{directives});
 
   return bless \%attr, $class;
+}
+
+sub encoded_string {
+  return Template::Pure::EncodedString->new($_[1]);
 }
 
 sub render {
@@ -30,11 +49,12 @@ sub render {
 
 sub _parse_match_spec {
   my ($self, $match_spec) = @_;
+  my $maybe_filter = $match_spec=~s/\|$// ? 1:0;
   my $maybe_append = $match_spec=~s/^(\+)// ? 1:0;
   my $maybe_prepend = $match_spec=~s/(\+)$// ? 1:0;
   my ($css, $maybe_attr) = split('@', $match_spec);
   $css = '.' if $maybe_attr && !$css; # not likely to be 0 so this is ok
-  return ($css, $maybe_attr, $maybe_prepend, $maybe_append);
+  return ($css, $maybe_attr, $maybe_prepend, $maybe_append, $maybe_filter);
 }
 
 sub _parse_dataproto {
@@ -61,9 +81,15 @@ sub _call_codetag {
 
 sub _parsetag {
   my ($self, $tag, $data) = @_;
+  my ($tag, @filters) = split( /\s*?\|\s*?/, $tag);
+
+  Dwarn \@filters;
+  
   my ($part, @more) = split('\.', $tag);
-  my $value = $self->data_at_path($data, $part, @more); 
-  return defined $value ? $value : die "No value for $tag in: ".Dumper $data;
+  defined(my $value = $self->data_at_path($data, $part, @more)) ||
+    die "No value for $tag in: ".Dumper $data;
+
+  return $value;
 }
 
 sub data_at_path {
@@ -82,7 +108,7 @@ sub _render_recursive {
   while($#{$directives}> $index) {
     my $match = $directives->[$index++];
     my $tag =  $directives->[$index++];
-    my ($css, $maybe_attr, $maybe_prepend, $maybe_append) = $self->_parse_match_spec($match);
+    my ($css, $maybe_attr, $maybe_prepend, $maybe_append, $maybe_filter) = $self->_parse_match_spec($match);
     if(ref($tag) && ref($tag) eq 'HASH') {
       my $sort_cb = delete $tag->{sort};
       my $filter_cb = delete $tag->{filter};
@@ -113,6 +139,9 @@ sub _render_recursive {
     } else {
       if(my $ele = ($css eq '.' ? $dom->at('*') : $dom->at($css))) {
         my $value = $self->_parse_dataproto($tag, $data, $ele);
+        next if $maybe_filter;
+        $value = $self->{filters}{escape_html}->($value);
+
         if($maybe_attr) {
           if($maybe_prepend) {
              $ele->attr($maybe_attr => "${\$ele->attr($maybe_attr)}$value");

@@ -69,16 +69,20 @@ ok my @directives = (
   'title' => 'page_title',
   'head+' => sub {
     my ($template, $dom, $data) = @_;
-    return $include->render($data);
-  },
-  'body' => sub {
-    my ($template, $dom, $data) = @_;
-    return $wrapper->render(+{content=>$dom->content});
+    return $template->encoded_string($include->render($data));
   },
   'h1#headline' => sub {
     my ($template, $dom, $data) = @_;
     return $template->data_at_path($data, 'random_stuff');
   },
+  'body' => sub {
+    my ($template, $dom, $data) = @_;
+    return $template->encoded_string(
+      $wrapper->render(
+      +{ content=>$template->encoded_string($dom->content) }
+    ));
+  },
+
   'dl#dlist' => {
     'property<-author' => [
       'dt' => 'i.index',
@@ -119,7 +123,7 @@ ok my @directives = (
       'ul.friends li' => {
         'friend<-person.friends' => [
           '.' => 'friend',
-          '@id' => 'friend',
+          '@id' => 'friend|lc',
         ],
       },
       'ol#numbers li' => {
@@ -144,6 +148,12 @@ ok my @directives = (
       '#license' => 'license',
     ],
   },
+  'body|' => sub {
+    my ($template, $dom, $data) = @_;
+    $dom->find('p')->each( sub {
+      $_->attr('data-pure', 1);
+    });
+  }
 );
 
 ok my $pure = Template::Pure->new(
@@ -152,8 +162,8 @@ ok my $pure = Template::Pure->new(
 
 ok my %data = (
   angular => '/js/3rd-party/angular.resource.min.js',
-  random_stuff => 'New Headline',
-  page_title => 'Just Another Page',
+  random_stuff => '<p>New Headline',
+  page_title => 'Just Another Page<script></script>',
   return_url => 'https://localhost/basepage.html',
   meta => {
     copyright => 2016,
