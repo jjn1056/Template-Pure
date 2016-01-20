@@ -6,17 +6,17 @@ package Template::Pure::Iterator;
 use Scalar::Util 'blessed';
 
 sub from_proto {
-  my ($class, $proto, $sort_cb, $filter_cb) = @_;
+  my ($class, $proto, $sort_cb, $filter_cb, $options) = @_;
   if(blessed $proto) {
-    return $class->from_object($proto, $sort_cb, $filter_cb);
+    return $class->from_object($proto, $sort_cb, $filter_cb, $options);
   } else {
     my $type = 'from_' .lc ref $proto;
-    return $class->$type($proto, $sort_cb, $filter_cb);
+    return $class->$type($proto, $sort_cb, $filter_cb, $options);
   }
 }
 
 sub from_object {
-  my ($class, $obj, $sort_cb, $filter_cb) = @_;
+  my ($class, $obj, $sort_cb, $filter_cb, $options) = @_;
   my ($index, $current) = (0);
  
   if(
@@ -52,7 +52,7 @@ sub from_object {
     }, $class;
   } else {
     my %hash;
-    if(my $fields = $obj->can('display_fields')) {
+    if(my $fields = $obj->can($options->{fields_method} ||'display_fields')) {
       %hash = map { $_ => $obj->$_ } ($fields->());
     } else {
       %hash =  %{$obj};

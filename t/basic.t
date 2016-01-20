@@ -1,6 +1,28 @@
 use Test::Most;
 use Template::Pure;
 
+ok my $include_html = qq[
+  <meta charset="utf-8" />
+  <meta name="description" content="Example Include">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script></script>
+];
+
+ok my $include = Template::Pure->new(
+  template=>$include_html,
+  directives=> [ 'script@src' => 'angular']
+);
+
+ok my $wrapper_html = qq[
+  <div class='container'>Inside the container</div>
+  ];
+
+ok my $wrapper = Template::Pure->new(
+  template=>$wrapper_html,
+  directives=> [ 'div.container' => 'content']
+);
+
+
 ok my $html_string = qq[
   <html>
     <head>
@@ -36,20 +58,32 @@ ok my $html_string = qq[
         <p>All cites relative...</p>
       </ol>
       <p id='copyright'>XXXX<span>asdasd</span>sadasd</p>
+      <div id='meta'>
+        <p id='copyright'>ZZZ</p>
+        <p id='license'>??</p>
+      </div>
     </body>
   </html>];
 
-ok my %directives = (
+ok my @directives = (
   'title' => 'page_title',
+  'head+' => sub {
+    my ($template, $dom, $data) = @_;
+    return $include->render($data);
+  },
+  'body' => sub {
+    my ($template, $dom, $data) = @_;
+    return $wrapper->render(+{content=>$dom->content});
+  },
   'h1#headline' => sub {
     my ($template, $dom, $data) = @_;
     return $template->data_at_path($data, 'random_stuff');
   },
   'dl#dlist' => {
-    'property<-author' => {
+    'property<-author' => [
       'dt' => 'i.index',
       'dd' => 'property',
-    },
+    ],
     'sort' => sub {
       my ($data, $a, $b) = @_;
       return lc($data->{$a}) cmp lc($data->{$b});
@@ -65,10 +99,10 @@ ok my %directives = (
   '+#email' => 'author.email',
   '#copyright' => 'meta.copyright',
   '#cite li' => {
-    'cite<-citations' => {
+    'cite<-citations' => [
       'span' => 'cite',
       'span@id' => 'cite_#{i.index}',
-    },
+    ],
     'sort' => sub {
       my ($arrayref, $a, $b) = @_;
       return $b cmp $a;
@@ -79,17 +113,17 @@ ok my %directives = (
     },
   },
   'ul#people li.person' => {
-    'person<-people' => {
+    'person<-people' => [
       'span' => 'person.name',
       'span.age' => 'person.age',
       'ul.friends li' => {
-        'friend<-person.friends' => {
+        'friend<-person.friends' => [
           '.' => 'friend',
           '@id' => 'friend',
-        },
+        ],
       },
       'ol#numbers li' => {
-        'number<-person.numbers' => {
+        'number<-person.numbers' => [
           '.' => sub {
             my ($template, $dom, $data) = @_;
             my @classes = ();
@@ -100,17 +134,24 @@ ok my %directives = (
             $dom->attr(class=>join(' ', @classes)) if @classes;
             return  $data->{i}->current_value;
           },
-        },
+        ],
       }
-    },
+    ],
+  },
+  '#meta' => {
+    'meta' => [
+      '#copyright' => 'copyright',
+      '#license' => 'license',
+    ],
   },
 );
 
 ok my $pure = Template::Pure->new(
   template=>$html_string,
-  directives=>\%directives);
+  directives=>\@directives);
 
 ok my %data = (
+  angular => '/js/3rd-party/angular.resource.min.js',
   random_stuff => 'New Headline',
   page_title => 'Just Another Page',
   return_url => 'https://localhost/basepage.html',

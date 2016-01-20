@@ -10,7 +10,8 @@ use Data::Dumper;
 use Devel::Dwarn;
 
 sub new {
-  my ($class, %args) = @_;
+  my ($proto, %args) = @_;
+  my $class = ref($proto) || $proto;
   my %attr = (
     dom => DOM::Tiny->new($args{template}),
     directives => $args{directives});
@@ -29,7 +30,8 @@ sub render {
 
 sub _parse_match_spec {
   my ($self, $match_spec) = @_;
-  my ($maybe_prepend, $maybe_append) = ($match_spec=~s/^(\+)|(\+)$//);
+  my $maybe_append = $match_spec=~s/^(\+)// ? 1:0;
+  my $maybe_prepend = $match_spec=~s/(\+)$// ? 1:0;
   my ($css, $maybe_attr) = split('@', $match_spec);
   $css = '.' if $maybe_attr && !$css; # not likely to be 0 so this is ok
   return ($css, $maybe_attr, $maybe_prepend, $maybe_append);
@@ -76,27 +78,35 @@ sub data_at_path {
 
 sub _render_recursive {
   my ($self, $data, $dom, $directives) = @_;
-  foreach my $match (keys %$directives) {
+  my $index = 0;
+  while($#{$directives}> $index) {
+    my $match = $directives->[$index++];
+    my $tag =  $directives->[$index++];
     my ($css, $maybe_attr, $maybe_prepend, $maybe_append) = $self->_parse_match_spec($match);
-    my $tag = $directives->{$match};
-    die "no match for $match in ". Dumper $directives unless defined $tag;
     if(ref($tag) && ref($tag) eq 'HASH') {
       my $sort_cb = delete $tag->{sort};
       my $filter_cb = delete $tag->{filter};
-      my ($data_spec, $new_directives) = %$tag;
-      my ($new_data_key, $current_key) = split('<-', $data_spec);
+      my $options = delete $tag->{options};
       if(my $ele = ($css eq '.' ? $dom : $dom->at($css))) {
-        my $iterator_proto = $self->_parse_dataproto($current_key, $data, $ele);
-        my $iterator = Template::Pure::Iterator->from_proto($iterator_proto, $sort_cb, $filter_cb);
-        while(my $datum = $iterator->next) {
-          my $new = DOM::Tiny->new($ele);
-          my $new_dom = $self->_render_recursive(
-            +{$new_data_key => $datum, i => $iterator},
-            $new,
-            $new_directives);
-          $ele->prepend($new_dom);
+        my ($data_spec, $new_directives) = %$tag;
+        if($data_spec=~m/\<\-/) {
+          my ($new_data_key, $current_key) = split('<-', $data_spec);
+          my $iterator_proto = $self->_parse_dataproto($current_key, $data, $ele);
+          my $iterator = Template::Pure::Iterator->from_proto($iterator_proto, $sort_cb, $filter_cb, $options);
+          while(my $datum = $iterator->next) {
+            my $new = DOM::Tiny->new($ele);
+            my $new_dom = $self->_render_recursive(
+              +{$new_data_key => $datum, i => $iterator},
+              $new,
+              $new_directives);
+            $ele->prepend($new_dom);
+          }
+          $ele->remove($css); #ugly, but can't find a better solution...
+        } else {
+          # no iterator, just move the context.
+           my $new_data = $self->_parse_dataproto($data_spec, $data, $ele);
+           $self->_render_recursive($new_data, $ele, $new_directives);
         }
-        $ele->remove($css); #ugly, but can't find a better solution...
       } else {
         die  "no $css at ${\$dom->to_string}"
       }
