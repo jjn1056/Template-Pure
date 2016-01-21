@@ -14,37 +14,44 @@ sub new {
   my ($proto, %args) = @_;
   my $class = ref($proto) || $proto;
   my %attr = (
-    filters => {
-      uc => sub { uc shift },
-      lc => sub { lc shift },
-      ltrim => sub { my $s = shift; $s =~ s/^\s+//; return $s },
-      rtrim => sub { my $s = shift; $s =~ s/\s+$//; return $s },
-      trim => sub { my $s = shift; $s =~ s/^\s+|\s+$//g; return $s },
-      escape_html => sub {
-        my %_escape_table = ( '&' => '&amp;', '>' => '&gt;', '<' => '&lt;', q{"} => '&quot;', q{'} => '&#39;' );
-        my $s = shift;
-        return $s if blessed $s && $s->isa('Template::Pure::EncodedString');
-        $s =~ s/([&><"'])/$_escape_table{$1}/ge; 
-        return $s;
-      },
-    },
+    filters => +{$class->default_filters},
     dom => DOM::Tiny->new($args{template}),
     directives => $args{directives});
 
   return bless \%attr, $class;
 }
 
-sub encoded_string {
-  return Template::Pure::EncodedString->new($_[1]);
+sub default_filters {
+  my ($class) = @_;
+  return (
+    uc => sub { uc shift },
+    lc => sub { lc shift },
+    ltrim => sub { my $s = shift; $s =~ s/^\s+//; return $s },
+    rtrim => sub { my $s = shift; $s =~ s/\s+$//; return $s },
+    trim => sub { my $s = shift; $s =~ s/^\s+|\s+$//g; return $s },
+    escape_html => sub {
+      my %_escape_table = ( '&' => '&amp;', '>' => '&gt;', '<' => '&lt;', q{"} => '&quot;', q{'} => '&#39;' );
+      my $s = shift;
+      return $s if blessed $s && $s->isa('Template::Pure::EncodedString');
+      $s =~ s/([&><"'])/$_escape_table{$1}/ge; 
+      return $s;
+    },
+  );
 }
 
-sub render {
-  my ($self, $data) = @_;
+sub encoded_string { return Template::Pure::EncodedString->new($_[1]) }
+
+sub process_dom {
+  my ($self, $data, $opt_directives) = @_;
   my $dom = $self->_render_recursive(
     $data,
     $self->{dom},
-    $self->{directives});
-  return $dom->to_string;
+    [@{$self->{directives}}, @{$opt_directives||[]}]);
+  return $dom;
+}
+sub render {
+  my ($self, $data, $opt_directives) = @_;
+  return $self->process_dom($data, $opt_directives)->to_string;
 }
 
 sub _parse_match_spec {
@@ -80,15 +87,18 @@ sub _call_codetag {
 }
 
 sub _parsetag {
-  my ($self, $tag, $data) = @_;
-  my ($tag, @filters) = split( /\s*?\|\s*?/, $tag);
-
-  Dwarn \@filters;
-  
+  my ($self, $tag_proto, $data) = @_;
+  my ($tag, @filters) = split( /\s*\|\s*/, $tag_proto);
   my ($part, @more) = split('\.', $tag);
   defined(my $value = $self->data_at_path($data, $part, @more)) ||
     die "No value for $tag in: ".Dumper $data;
 
+  return $self->apply_filters($value, @filters);
+}
+
+sub apply_filters {
+  my ($self, $value, @filters) = @_;
+  $value = $self->{filters}{$_}->($value) for @filters;
   return $value;
 }
 
@@ -113,6 +123,7 @@ sub _render_recursive {
       my $sort_cb = delete $tag->{sort};
       my $filter_cb = delete $tag->{filter};
       my $options = delete $tag->{options};
+      my $following_directives = delete $tag->{directives};
       if(my $ele = ($css eq '.' ? $dom : $dom->at($css))) {
         my ($data_spec, $new_directives) = %$tag;
         if($data_spec=~m/\<\-/) {
@@ -128,6 +139,20 @@ sub _render_recursive {
             $ele->prepend($new_dom);
           }
           $ele->remove($css); #ugly, but can't find a better solution...
+        } elsif(my ($wrapper_key) = ($data_spec=~/^>(.+)<$/)) {
+          my $wrapper = $self->_parse_dataproto($wrapper_key, $data, $ele);
+          my %wrapper_data = ();
+          foreach my $key(keys %$new_directives) {
+            my $wrap_css = $new_directives->{$key};
+            if(my $wrap_ele = ($wrap_css eq '.' ? $ele : $ele->at($wrap_css))) {
+              $wrapper_data{$key} = $self->encoded_string($wrap_ele);
+            } else {
+              die "no match for '$css' in " .Dumper $ele;
+            }
+          }
+          my $wrapped = $wrapper->process_dom(\%wrapper_data);
+          $self->_render_recursive($data, $wrapped, $following_directives) if $following_directives; 
+          $ele->replace($wrapped);
         } else {
           # no iterator, just move the context.
            my $new_data = $self->_parse_dataproto($data_spec, $data, $ele);
@@ -140,8 +165,14 @@ sub _render_recursive {
       if(my $ele = ($css eq '.' ? $dom->at('*') : $dom->at($css))) {
         my $value = $self->_parse_dataproto($tag, $data, $ele);
         next if $maybe_filter;
-        $value = $self->{filters}{escape_html}->($value);
 
+        if(blessed $value) {
+          if($value->isa('Template::Pure')) {
+            $value = $self->encoded_string($value->render($data));
+          }
+        }
+
+        $value = $self->{filters}{escape_html}->($value);
         if($maybe_attr) {
           if($maybe_prepend) {
              $ele->attr($maybe_attr => "${\$ele->attr($maybe_attr)}$value");

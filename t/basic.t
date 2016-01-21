@@ -67,10 +67,7 @@ ok my $html_string = qq[
 
 ok my @directives = (
   'title' => 'page_title',
-  'head+' => sub {
-    my ($template, $dom, $data) = @_;
-    return $template->encoded_string($include->render($data));
-  },
+  'head+' => 'include',
   'h1#headline' => sub {
     my ($template, $dom, $data) = @_;
     return $template->data_at_path($data, 'random_stuff');
@@ -82,7 +79,6 @@ ok my @directives = (
       +{ content=>$template->encoded_string($dom->content) }
     ));
   },
-
   'dl#dlist' => {
     'property<-author' => [
       'dt' => 'i.index',
@@ -102,19 +98,26 @@ ok my @directives = (
   '#email@href+' => 'author.email',
   '+#email' => 'author.email',
   '#copyright' => 'meta.copyright',
-  '#cite li' => {
-    'cite<-citations' => [
-      'span' => 'cite',
-      'span@id' => 'cite_#{i.index}',
+  'ol#cite' => {
+    '>wrapper<' => {
+      content => '.'
+    },
+    directives => [
+      'li' => {
+        'cite<-citations' => [
+          'span' => 'cite',
+          'span@id' => 'cite_#{i.index}',
+        ],
+        'sort' => sub {
+          my ($arrayref, $a, $b) = @_;
+          return $b cmp $a;
+        },
+        'filter' => sub {
+          my $value = shift;
+          return $value !~m/d/;
+        },
+      },
     ],
-    'sort' => sub {
-      my ($arrayref, $a, $b) = @_;
-      return $b cmp $a;
-    },
-    'filter' => sub {
-      my $value = shift;
-      return $value !~m/d/;
-    },
   },
   'ul#people li.person' => {
     'person<-people' => [
@@ -123,7 +126,7 @@ ok my @directives = (
       'ul.friends li' => {
         'friend<-person.friends' => [
           '.' => 'friend',
-          '@id' => 'friend|lc',
+          '@id' => 'friend |lc',
         ],
       },
       'ol#numbers li' => {
@@ -165,6 +168,8 @@ ok my %data = (
   random_stuff => '<p>New Headline',
   page_title => 'Just Another Page<script></script>',
   return_url => 'https://localhost/basepage.html',
+  include => $include,
+  wrapper => $wrapper,
   meta => {
     copyright => 2016,
     license => 'Artistic',
@@ -179,21 +184,14 @@ ok my %data = (
     { name => 'john Doe', age => 25, numbers => [qw/10 20 25/], friends => [qw/Mark Mary Joe Jack Jason/] },
     { name => 'Bill On', age => 45, numbers => [qw/35 42/], friends =>[qw/Srivinas Milton Aubrey/]}]);
 
-ok my $rendered_template = $pure->render(\%data);
+ok my $rendered_template = $pure->render(
+  \%data,
+  [ 'title|' => sub {
+    my ($t, $dom, $data) = @_;
+    $dom->content(uc $dom->content);
+  }]
+);
 
 warn($rendered_template);
 
 done_testing;
-
-
-__END__
-
-## TODO
-
-interators on objects and hashes
-
->include.html
-
-
-
-
