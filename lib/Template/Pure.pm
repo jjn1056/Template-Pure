@@ -203,16 +203,13 @@ sub _render_recursive {
         $col->reverse->each( sub {
           my ($ele, $cnt) = @_;
           my $value = $self->_parse_dataproto($tag, $data, $ele);
-          next if $maybe_filter;
+          return if $maybe_filter;
 
           if(blessed $value) {
             if($value->isa('Template::Pure')) {
               if($maybe_wrapper) {
                 my $string = $value->render(+{%$data, $self->wrapper_data_key=>$self->encoded_string($ele)});
-
-#warn $string;
-$_->replace($string);
-#warn "$cnt .....\n\n\n";
+                $_->replace($string);
                 return;
               } else {
                 $value = $self->encoded_string($value->render($data));
