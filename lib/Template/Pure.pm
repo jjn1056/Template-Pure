@@ -21,6 +21,21 @@ sub new {
   return bless \%attr, $class;
 }
 
+sub wrapper_data_key { 'content'}
+
+sub wrapper {
+  my ($proto, $content_match, $template, $directives) = @_;
+  my $class = ref($proto) || $proto;
+
+  return $class->new(
+    template => $template,
+    directives => [
+      @{$directives||[]},
+      $content_match => $class->wrapper_data_key,
+    ]
+  );
+}
+
 sub default_filters {
   my ($class) = @_;
   return (
@@ -51,18 +66,27 @@ sub process_dom {
 }
 sub render {
   my ($self, $data, $opt_directives) = @_;
-  return $self->process_dom($data, $opt_directives)->to_string;
+  my $string = $self->process_dom($data, $opt_directives)->to_string;
+  return $string;
 }
 
 sub _parse_match_spec {
   my ($self, $match_spec) = @_;
+
+  my $maybe_wrapper = 0;
+  if(my ($wrapper_key) = ($match_spec=~/^\{(.+)\}$/)) {
+    $match_spec = $wrapper_key;
+    $maybe_wrapper = 1;
+  }
+
   my $maybe_filter = $match_spec=~s/\|$// ? 1:0;
   my $maybe_append = $match_spec=~s/^(\+)// ? 1:0;
   my $maybe_prepend = $match_spec=~s/(\+)$// ? 1:0;
   my ($css, $maybe_attr) = split('@', $match_spec);
   $css = '.' if $maybe_attr && !$css; # not likely to be 0 so this is ok
-  return ($css, $maybe_attr, $maybe_prepend, $maybe_append, $maybe_filter);
+  return ($css, $maybe_attr, $maybe_prepend, $maybe_append, $maybe_filter, $maybe_wrapper);
 }
+
 
 sub _parse_dataproto {
   my ($self, $tag, $data, $ele) = @_;
@@ -88,12 +112,22 @@ sub _call_codetag {
 
 sub _parsetag {
   my ($self, $tag_proto, $data) = @_;
+  my $maybe_optional = $tag_proto=~s/^\?// ? 1:0;
   my ($tag, @filters) = split( /\s*\|\s*/, $tag_proto);
-  my ($part, @more) = split('\.', $tag);
-  defined(my $value = $self->data_at_path($data, $part, @more)) ||
-    die "No value for $tag in: ".Dumper $data;
+  my ($part, @more) = split(/\.|\//, $tag);
 
-  return $self->apply_filters($value, @filters);
+  if($part eq '') {
+    $part = shift @more;
+    $data = $data->{__root_data__};
+  }
+
+  if(  defined(my $value = $self->data_at_path($data, $part, @more)) ) {
+    return $self->apply_filters($value, @filters);
+  } else {
+    die "No value for $tag in: ".Dumper $data
+      unless $maybe_optional;
+    return bless(\$tag, 'OPTIONAL');
+  }
 }
 
 sub apply_filters {
@@ -118,7 +152,7 @@ sub _render_recursive {
   while($#{$directives}> $index) {
     my $match = $directives->[$index++];
     my $tag =  $directives->[$index++];
-    my ($css, $maybe_attr, $maybe_prepend, $maybe_append, $maybe_filter) = $self->_parse_match_spec($match);
+    my ($css, $maybe_attr, $maybe_prepend, $maybe_append, $maybe_filter, $maybe_wrapper) = $self->_parse_match_spec($match);
     if(ref($tag) && ref($tag) eq 'HASH') {
       my $sort_cb = delete $tag->{sort};
       my $filter_cb = delete $tag->{filter};
@@ -133,18 +167,20 @@ sub _render_recursive {
           while(my $datum = $iterator->next) {
             my $new = DOM::Tiny->new($ele);
             my $new_dom = $self->_render_recursive(
-              +{$new_data_key => $datum, i => $iterator},
+              +{$new_data_key => $datum, i => $iterator, (__root_data__=>$data->{__root_data__}||$data) },
               $new,
               $new_directives);
             $ele->prepend($new_dom);
           }
           $ele->remove($css); #ugly, but can't find a better solution...
-        } elsif(my ($wrapper_key) = ($data_spec=~/^>(.+)<$/)) {
-          my $wrapper = $self->_parse_dataproto($wrapper_key, $data, $ele);
+        } elsif(my ($merge_key) = ($data_spec=~/^>(.+)<$/)) {
+          my $wrapper = $self->_parse_dataproto($merge_key, $data, $ele);
           my %wrapper_data = ();
           foreach my $key(keys %$new_directives) {
             my $wrap_css = $new_directives->{$key};
-            if(my $wrap_ele = ($wrap_css eq '.' ? $ele : $ele->at($wrap_css))) {
+            if( (ref($wrap_css)||'') eq 'CODE') {
+              $wrapper_data{$key} = $self->encoded_string($wrap_css->($self,$ele));
+            } elsif(my $wrap_ele = ($wrap_css eq '.' ? $ele : $ele->at($wrap_css))) {
               $wrapper_data{$key} = $self->encoded_string($wrap_ele);
             } else {
               die "no match for '$css' in " .Dumper $ele;
@@ -156,40 +192,56 @@ sub _render_recursive {
         } else {
           # no iterator, just move the context.
            my $new_data = $self->_parse_dataproto($data_spec, $data, $ele);
+           $new_data->{__root_data__} = $data->{__root_data__}||$data;
            $self->_render_recursive($new_data, $ele, $new_directives);
         }
       } else {
         die  "no $css at ${\$dom->to_string}"
       }
     } else {
-      if(my $ele = ($css eq '.' ? $dom->at('*') : $dom->at($css))) {
-        my $value = $self->_parse_dataproto($tag, $data, $ele);
-        next if $maybe_filter;
+      if(my $col = ($css eq '.' ? $dom->find('*') : $dom->find($css))) {
+        $col->reverse->each( sub {
+          my ($ele, $cnt) = @_;
+          my $value = $self->_parse_dataproto($tag, $data, $ele);
+          next if $maybe_filter;
 
-        if(blessed $value) {
-          if($value->isa('Template::Pure')) {
-            $value = $self->encoded_string($value->render($data));
-          }
-        }
+          if(blessed $value) {
+            if($value->isa('Template::Pure')) {
+              if($maybe_wrapper) {
+                my $string = $value->render(+{%$data, $self->wrapper_data_key=>$self->encoded_string($ele)});
 
-        $value = $self->{filters}{escape_html}->($value);
-        if($maybe_attr) {
-          if($maybe_prepend) {
-             $ele->attr($maybe_attr => "${\$ele->attr($maybe_attr)}$value");
-          } elsif($maybe_append) {
-             $ele->attr($maybe_attr => "$value${\$ele->attr($maybe_attr)}");
-          } else {
-             $ele->attr($maybe_attr => $value);
+#warn $string;
+$_->replace($string);
+#warn "$cnt .....\n\n\n";
+                return;
+              } else {
+                $value = $self->encoded_string($value->render($data));
+              }
+            } elsif($value->isa('OPTIONAL')) {
+              return;
+            }
           }
-        } else {
-          if($maybe_prepend) {
-            $ele->append_content($value);
-          } elsif($maybe_append) {
-            $ele->prepend_content($value);
+
+          $value = $self->{filters}{escape_html}->($value);
+          if($maybe_attr) {
+            if($maybe_prepend) {
+               $ele->attr($maybe_attr => "${\$ele->attr($maybe_attr)}$value");
+            } elsif($maybe_append) {
+               $ele->attr($maybe_attr => "$value${\$ele->attr($maybe_attr)}");
+            } else {
+               $ele->attr($maybe_attr => $value);
+            }
           } else {
-            $ele->content($value);
+            if($maybe_prepend) {
+              $ele->append_content($value);
+            } elsif($maybe_append) {
+              $ele->prepend_content($value);
+            } else {
+              $ele->content($value);
+            }
           }
-        }
+        });
+
       } else {
         die "no $css at ${\$dom->to_string}"
       }
@@ -296,4 +348,29 @@ page-directives.json
 
 
 maybe let <div data-pure-key="val">
+
+
+separate a wrapper from an overlay
+all when in a loop to interate over all the matches
+
+<ol>
+  <li>111</li>
+  <li>222</li>
+<ol>
+
+when ^^ we fill the first two items
+
+
+|match => filter with node
+match| => filter content only
+'match|' => '&custom_filter'
+
+
+'^p' => match full node
+'p' => match content only
+
+'#id' => Template::Pure->removed
+
+have '$current => '.''
+
 =cut
