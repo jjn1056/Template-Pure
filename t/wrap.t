@@ -43,3 +43,10 @@ ok my $rendered_template = $to_wrap->render({
 warn $rendered_template;
 
 done_testing;
+
+__END__
+
+[
+  { $css, ?$attr, 'append, prepend, in
+
+
