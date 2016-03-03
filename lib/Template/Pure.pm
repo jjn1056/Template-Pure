@@ -441,7 +441,7 @@ value in the current template:
     my $pure = Template::Pure->new(
       template = $html,
       directives => [
-        'h1#title' => \'title',
+        'h1#title' => \'/title',
       ]);
 
     print $pure->render({});
@@ -459,6 +459,11 @@ Results in:
 
 B<NOTE> Since directives are processed in order, this means that you can
 reference the rendered value of a previous directive via this alias.
+
+B<NOTE> The match runs against the current selected node, as defined by the last
+successful match.  This means quite often you will need to use the '/' and '../'
+special match syntax to indicate a match from the root of the DOM or a match from
+the most immediate parent node (or root).
 
 =head2 Coderef - Programmatically replace the value indicated
 
@@ -663,6 +668,7 @@ Results in:
       <dt>Email</dt>
       <dd class='email'>jjnapiork@cpan.org'</dd>
     </dl>
+
 
 
 =head2 Hashref - Create a Loop
@@ -874,6 +880,7 @@ You may provide a custom anonymous subroutine to provide a display
 specific order to your loop.  For simple values such as Arrayrefs
 and hashrefs this is simple:
 
+    my $html = qq[
       <ol id='names'>
         <li class='name'>
           <span class='first-name'>John</span>
@@ -1054,6 +1061,9 @@ When encountering such an object we pass the current data context, but we
 add one additional field called 'content' which is the value of the matched
 node.  You can use this so that you can 'wrap' nodes with a template (similar
 to the L<Template> WRAPPER directive).
+
+TODO: Should 'content' be the node value, or the full node... or do we need
+more than one injected data path (value, node, ...)
 
     my $wrapper_html = qq[
       <p class="headline">To Be Wrapped</p>
@@ -1310,11 +1320,18 @@ with sub directives.
       ]
     );
 
+=item '..': Up to the current nodes parent (or the root node) ???
+
+=item '/': The root node
+
 =item '@': Select an attributes within the current node
 
 =item '+': Append or prepend a value
 
 B<NOTE> Can be combined with '@' to append / prepend to an attribute.
+
+B<NOTE> Special handling when appending or prepending to a class attribute (we add a
+space if there is an existing since that is expected).
 
 =item '^': Replace current node completely
 
@@ -1329,8 +1346,13 @@ B<NOTE> Can be combined with '@' to append / prepend to an attribute.
 
 =back 
 
-
 =head1 Overlay ???
+
+=head1 PROCESSING INSTRUCTIONS
+
+You may use processing instructions in your template to indicate setup values
+
+<?pure-directives ?>
 
 =head1 AUTHOR
  
@@ -1351,17 +1373,5 @@ Copyright 2016, John Napiorkowski L<email:jjnapiork@cpan.org>
  
 This library is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.
-  
-
-  directives => [
-    'title' => 'story.title',
-    ['body', {
-      inner_header => 'story.headline',
-      ... => \'#body'
-    }] => $inner, ... ];
-  ],
-
-
-need a proxy object when injecting i and content
 
 =cut
