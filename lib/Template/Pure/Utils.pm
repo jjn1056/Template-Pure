@@ -3,8 +3,108 @@ package Template::Pure::Utils;
 use strict;
 use warnings;
 
+sub parse_itr_spec {
+  my ($spec) = @_;
+  my ($key, $data_spec) = split('<-', $spec);
+  return $key => +{ parse_data_spec($data_spec) };
+}
+
+sub parse_data_template {
+  my ($spec) = @_;
+  my $opentag = qr/=\{/;
+  my $closetag = qr/\}/;
+  my $placeholder = qr{(
+    (?:
+      $opentag ( 
+        (?:
+          (?> [^\=\{\}]+ )
+          |
+          (?2)
+        )*
+      ) $closetag
+    )
+  )}x;
+
+  my @parts;
+  while($spec =~/( [^$opentag]+ ) | $placeholder /gx) {
+    my $part = $1||$2;
+    if(my ($is_data_spec) = ($part=~/^$opentag(.+?)$closetag$/)) {
+      push @parts, +{ parse_data_spec($is_data_spec) };
+    } else {
+      push @parts, $part;
+    }
+  }
+
+  return @parts;
+}
+
+sub parse_data_spec {
+  my $spec = shift;
+  my $absolute = ($spec=~s[^\/][]);
+
+  my @parts;
+  push @parts, $1 while $spec =~ /
+  ((?:
+    [^()\|]+ |
+    ( \(
+      (?: [^()]+ | (?2) )*
+    \) )
+  )*)
+  (?: \|\s* | $)
+  /xg;
+
+  my ($path_proto, @filters_proto) = 
+    grep { length($_) > 0 } 
+      map { $_=~s/\s+$//; $_ } @parts;
+      
+  my @path_proto = split(/\.|\//, $path_proto);
+
+  my @path = map {
+    # Not ideal regexp here but safe enough I think since ':' is never in a method...
+    # Just would croak on a hash key that is meant to mean this.  I'll doc that as
+    # 'don't do that...
+    my $maybe = ($_=~s/(maybe:)//);
+    my $optional = ($_=~s/(optional:)//);
+    +{ key => $_, maybe => $maybe, optional => $optional };
+  } @path_proto;
+
+  my @filters = map {
+    my ($filter, $arg_proto) = ($_=~m/^(.*?)(?:\(\s*(.+?)?\s*\))?$/); # Borrowed from Catalyst::Controller
+    my @arg_parts;
+
+    if($arg_proto) {
+      push @arg_parts, $1 while $arg_proto =~ /
+      ((?:
+        [^(),]+ |
+        ( \(
+          (?: [^()]+ | (?2) )*
+        \) )
+      )*)
+      (?: ,\s* | $)
+      /xg;
+    }
+
+    my @args = map {
+      my ($data_spec) = ($_=~/^\=\{(.+?)\}$/);
+      $data_spec ? +{ parse_data_spec($data_spec) } : eval $_;
+    } grep { 
+        length($_) > 0;
+      } @arg_parts;
+
+    +[ $filter, @args ];
+  } @filters_proto;
+
+  return (
+    absolute => $absolute,
+    path => \@path,
+    filters => \@filters,
+  );
+}
+
 sub parse_match_spec {
   my $spec = shift;
+
+  # Look for all the possibilities, try to leave $spec in a useful state
   my $maybe_target_node = ($spec=~s/^\^//);
   my $maybe_filter = ($spec=~s/\|$//);
   my $maybe_prepend = ($spec=~s/^(\+)//);
@@ -12,6 +112,7 @@ sub parse_match_spec {
   my ($css, $maybe_attr) = split('@', $spec);
   $css = '.' if $maybe_attr && !$css; # $css unlikely to be 0
 
+  # All the error conditions I can think of.
   die "You need a CSS style match: '$spec'"
     unless $css;
 
@@ -48,7 +149,6 @@ sub parse_match_spec {
   );
 }
 
-
 1;
 
 =head1 NAME
@@ -67,7 +167,224 @@ Contains utility functions for L<Template::Pure>
 
 This package contains the following functions:
 
-=head2 parse_match_spec ($template, $spec)
+=head2 parse_itr_spec ($spec)
+
+Used to parse a string when we are specifying an iterator. For example
+
+    "user<-users"
+
+or:
+
+  "friend<-user.friends"
+
+Returns a hashref when the key is the new data label and the value is a reference to the
+indicated path from the current data context.
+
+    {
+      user => {
+        absolute => '';
+        filters => [],
+        path => [
+          key => 'users',
+          maybe => '',
+          optional => ''
+        ],
+      },
+    }
+
+B<NOTE> you cannot use a filter on an iterator specification.
+
+B<NOTE> Indicated data context path must be something that can be coerced into an iterator
+(an arrayref, a hashref, or an Object that provides the iterator interface).
+
+=head2 parse_data_template ($spec)
+
+Used to parse a string that is the target action of a match, when the string contains
+template placeholders, for example:
+
+    "Hello ={meta.first_name} ={meta.last_name}!"
+
+Which is intended to be parsed as containing a string with two placeholders, each pointing
+to a different path on the current data context.
+
+When parsed returns an array, where each element is either a string (for a literal string
+value) or a hash reference (indicates a patch to a value on the current data context).
+
+For example the shown string would parse in this way:
+
+    (
+      'Hello ',
+      {
+        absolute => '',
+        filters => [],
+        path => [ 
+          { key => 'meta', optional => undef, maybe => undef },
+          { key => 'first_name', optional => undef, maybe => undef },
+      },
+      ' ',
+      {
+        absolute => '',
+        filters => [],
+        path => [ 
+          { key => 'meta', optional => undef, maybe => undef },
+          { key => 'first_name', optional => undef, maybe => undef },
+      },
+      '!',
+    );
+
+Information inside the placeholder may contain filters and prefixes and other markers:
+
+    "Year of Birth: ={/maybe:meta.optional:dob | strftime(%Y)}"
+
+Would parse as:
+
+    (
+      'Year of Birth: ',
+      {
+        absolute => '1',
+        filters => [
+          ['strftime', '%Y'],
+        ],
+        path => [ 
+          { key => 'meta', optional => undef, maybe => 1 },
+          { key => 'dob', optional => 1, maybe => undef },
+      },
+    );
+
+
+=head2 parse_data_spec ($spec)
+
+When the action target is a string we need to inspect it to figure out what do do with it.
+Returns a hash with keys as follows:
+
+=over 4
+
+=item absolute
+
+Boolean.  Defaults to False.  When true this means the described path should be absolute
+from the top of the data context.  Otherwise the described path is relative to the current
+point selected in the data context.
+
+
+=item path
+
+    Example:
+
+    path => [
+      {
+        key => 'meta',
+        optional => 0,
+        maybe => 0
+      },
+      {
+        key => 'title',
+        optional => 0,
+        maybe => 0
+      }
+    ];
+
+An array hashrefs that indicate path parts from the current data context to the value we
+wish to use.  Each hashref contains three keys:
+
+=over 4
+
+=item key
+
+The name that is a 'key' point on the path.  Likely to be a key in a hash or a method on an
+object.
+
+=item optional
+
+Boolean.  Defaults to false.  Generally if the key does not match a real path on the current
+data context, this should return an error.  If this value is false, that means instead of
+throwing an error we return an 'undef'.
+
+Value is derived from the prefix 'optional:'. Presence of this prefix sets this to true.
+
+B<NOTE> since 'optional:' has special meaning here, this means that if your data context is
+a hash, you should not have any keys that match 'optional:' for your own purposes...  If you
+really run into this you'll have to write an anonymous subroutine type action.
+
+=item maybe
+
+Boolean.  Defaults to false.  Generally if you have several path parts and a midpoint part 
+returns undefined, that mean we throw an exception on later parts (can't find a next path on
+an undefined value).  In some cases (like when you are chaining resultset methods in L<DBIx::Class>)
+we might not prefer tothrow an error but just return 'undef'.  When a path is 'maybe' we
+wrap in in an object such that the next path is always found (but returns undef).
+
+Value is derived from the prefix 'maybe:'.  Presence of this prefix sets this to true.
+
+B<NOTE> since 'maybe:' has special meaning here, this means that if your data context is
+a hash, you should not have any keys that match 'maybe:' for your own purposes...  If you
+really run into this you'll have to write an anonymous subroutine type action.
+
+=back
+
+=item filters
+
+An Arrayref of Arrayrefs which are any filters added to the value and their arguments.
+
+    Example:
+
+    filters => [
+      [ 'repeat', '3'],
+      [ 'escape_html' ],
+    ];
+
+In some cases the arguments for a filter might itself point to a resolved data spec (which itself
+could include filters...  In this case the argument value will be a hashref that is itself the 
+result of a call to L</parse_data_spec>, example:
+
+    (
+      path => [
+        {
+          key => 'meta', maybe => 0, optional => 0,
+        },
+        {
+          key => 'title', maybe => 0, optional => 0,
+        },
+      ],
+      filters => [
+        ['title_case'],
+        ['truncate',
+          {
+            path => [
+              { key => 'settings', maybe => 0, optional => 0 },
+              { key => 'title_length', maybe => 0, optional => 0 },
+            ],
+            filters => [],
+          },
+          '...',
+        ],
+      ],
+    );
+
+You'd have a string to parse like "meta.title | title_case | truncate(={settings.title_length},'...')"
+which has a filter 'truncate' that has two args, the first being 'whatever the value is at
+'settings.title_length'' and the second is a literal '...'.
+
+You could go wild here with nested values and filters but I recommend if you have such complex
+needs it would be better to do it in Perl with an anonymous subroutine rather than over cleverness
+in the string based DSL, which will never be as good as Perl itself.  Use it for straight and simple
+things and for when you want to let non Perl programmers work with the directives.
+
+B<NOTE> we run C<eval> on each argument to convert it to a Perl data value, so you could in
+theory do fancy stuff here like "filter(1+2+3)" and get an arg of '3'.  I highly recommend constraint
+in this.  Since its C<eval>'d you should be certain these values are properly cleaned and untainted.
+For example beware of something like "filter($a)", where $a comes from uncontrolled source such as the
+input of a HTML Form post, or from external sources like a database or file.  This could be considered
+a possible injection attack location.  Because of this we might someday switch this to a non eval
+parser such as L<Data::Pond> or similar, and if you did crazy expression stuff that don't work with
+a more restrictive and safe expression parser, its possible your code will break.  Buyer beware.
+
+B<NOTE> The values for the boolean keys 'maybe' and 'optional' are only specificed to return a
+Perl value to be evaluated as a boolean.  We don't specify the exact value.  For example, under Perl
+both 0 and undef are considered false in boolean context.
+
+=back
+
+=head2 parse_match_spec ($spec)
 
 Given a directive match specification (such as '#head', 'title', 'p.links@href', ...) parse
 it into a hash that defines how the match is to be performed.  Returns a hash with keys are

@@ -740,6 +740,9 @@ removed (the matched node, not just the value).
 B<NOTE>: This behavior is somewhat different from pure.js, our inspiration.  Changes
 have been made to be more consistent with our extended behavior.
 
+B<NOTE>: should we say that if a path exists but returns undef, we should have a special zero
+length iterator (or something else, like [])...
+
 =head3 Special value injected into a loop
 
 When you create a loop we automatically add a special data key called 'i' (or 'ii', 'iii', etc
