@@ -2,6 +2,27 @@ package Template::Pure::Utils;
  
 use strict;
 use warnings;
+use Scalar::Util ();
+
+sub escape_html {
+  my ($value) = @_;
+  my %_escape_table = (
+    '&' => '&amp;', 
+    '>' => '&gt;', 
+    '<' => '&lt;',
+    q{"} => '&quot;',
+    q{'} => '&#39;' );
+
+  if(
+    Scalar::Util::blessed($value) && 
+    $value->isa('Template::Pure::EncodedString')
+  ) {
+    return $value;
+  } else {
+    $value =~ s/([&><"'])/$_escape_table{$1}/ge; 
+    return $value;
+  }
+}
 
 sub parse_itr_spec {
   my ($spec) = @_;
@@ -40,6 +61,7 @@ sub parse_data_template {
 
 sub parse_data_spec {
   my $spec = shift;
+  $spec=~s/[\n\r]//gs; # cleanup newlines.
   my $absolute = ($spec=~s[^\/][]);
 
   my @parts;
@@ -55,8 +77,8 @@ sub parse_data_spec {
 
   my ($path_proto, @filters_proto) = 
     grep { length($_) > 0 } 
-      map { $_=~s/\s+$//; $_ } @parts;
-      
+      map { $_=~s/^\s+|\s+$//g; $_ } @parts;
+
   my @path_proto = split(/\.|\//, $path_proto);
 
   my @path = map {
@@ -109,6 +131,8 @@ sub parse_match_spec {
   my $maybe_filter = ($spec=~s/\|$//);
   my $maybe_prepend = ($spec=~s/^(\+)//);
   my $maybe_append = ($spec=~s/(\+)$//);
+  my $maybe_absolute = ($spec=~s[^\/][]);
+
   my ($css, $maybe_attr) = split('@', $spec);
   $css = '.' if $maybe_attr && !$css; # $css unlikely to be 0
 
@@ -143,6 +167,7 @@ sub parse_match_spec {
   }
 
   return (
+    absolute => $maybe_absolute,
     css => $css,
     target => $target,
     mode => $mode,

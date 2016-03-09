@@ -1,28 +1,258 @@
+use strict;
+use warnings;
+
 package Template::Pure;
 
-use Scalar::Util;
+use DOM::Tiny;
+use Template::Pure::Utils;
+use Template::Pure::Filters;
+use Template::Pure::DataContext;
+use Template::Pure::EncodedString;
 
-sub default_filters {
-  my ($class) = @_;
-  return (
-    uc => sub { uc pop },
-    lc => sub { lc pop },
-    ltrim => sub { my $s = pop; $s =~ s/^\s+//; return $s },
-    rtrim => sub { my $s = pop; $s =~ s/\s+$//; return $s },
-    trim => sub { my $s = pop; $s =~ s/^\s+|\s+$//g; return $s },
-    escape_html => sub {
-      my $s = pop;
-      return $s if Scalar::Util::blessed($s) && $s->isa('Template::Pure::EncodedString');
-      my %_escape_table = (
-        '&' => '&amp;', '>' => '&gt;', '<' => '&lt;', 
-        q{"} => '&quot;', q{'} => '&#39;' );
-      $s =~ s/([&><"'])/$_escape_table{$1}/ge; 
-      return $s;
-    },
-  );
+sub new {
+  my ($proto, %args) = @_;
+  my $class = ref($proto) || $proto;
+  return bless +{
+    filters => $args{filters} || +{},
+    dom => DOM::Tiny->new($args{template}),
+    directives => $args{directives},
+  }, $class;
 }
 
-has 
+sub render {
+  my ($self, $data_proto) = @_;
+  return $self->process_dom($data_proto)->to_string;
+}
+
+sub process_dom {
+  my ($self, $data_proto) = @_;
+  return $self->_process_dom_recursive(
+    $data_proto,
+    $self->{dom},
+    @{$self->{directives}},
+    );
+}
+
+sub default_filters { Template::Pure::Filters->all }
+sub parse_match_spec { Template::Pure::Utils::parse_match_spec($_[1]) }
+sub parse_data_spec { Template::Pure::Utils::parse_data_spec($_[1]) }
+sub escape_html { Template::Pure::Utils::escape_html($_[1]) }
+sub encoded_string { Template::Pure::EncodedString->new($_[1]) }
+
+sub at_or_die {
+  my ($self, $dom, $css) = @_;
+  my $new = $dom->at($css);
+  die "$css is not a matching path" unless defined $new;
+  return $new;
+}
+
+sub _process_dom_recursive {
+  my ($self, $data_proto, $dom, @directives) = @_;
+  my $data = Template::Pure::DataContext->new($data_proto);
+
+  ($data, @directives) = $self->_process_directive_instructions($data, @directives);
+
+  # If the first directive is a HashRef, that's a request to build an
+  # new $data object.
+  if( (ref($directives[0])||'') eq 'HASH') {
+    my %map = %{shift(@directives)};
+    my %new_data;
+    foreach my $key (keys %map) {
+      my %sub_data_spec = $self->parse_data_spec($map{$key});
+      my $value = $self->_value_from_data($data, %sub_data_spec);
+      $new_data{$key} = $value;
+    }
+    $data = Template::Pure::DataContext->new(\%new_data);
+  }
+
+  while(@directives) {
+    my %match_spec = $self->parse_match_spec (shift @directives);
+    my $action_proto = shift @directives;
+
+    $dom = $dom->root if $match_spec{absolute};
+
+    if($match_spec{mode} eq 'filter') {
+      $self->_process_dom_filter($dom, $data, $match_spec{css}, $action_proto);
+    } elsif(ref \$action_proto eq 'SCALAR') {
+      my %data_spec = $self->parse_data_spec($action_proto);
+      my $value = $self->_value_from_data($data, %data_spec);
+      $self->_process_match_spec($dom, $value, %match_spec);
+    } elsif((ref($action_proto)||'') eq 'SCALAR') {
+      my $value = $self->_value_from_dom($dom, $$action_proto);
+      $self->_process_match_spec($dom, $value, %match_spec);
+    } elsif((ref($action_proto)||'') eq 'ARRAY') {
+        $self->process_sub_directives($dom, $data->value, $match_spec{css}, @{$action_proto});
+     } elsif((ref($action_proto)||'') eq 'CODE') {
+      my $value = $action_proto->($self, $dom, $data);
+      $self->_process_match_spec($dom, $value, %match_spec);
+    } elsif((ref($action_proto)||'') eq 'HASH') {
+      # Could be data localize, data remap or iterator
+      $self->_process_sub_data($dom, $data, $match_spec{css}, %{$action_proto});
+    }
+  }
+
+  return $dom;
+}
+
+sub _process_directive_instructions {
+  my ($self, $data, @directives) = @_;
+  if( (ref($directives[0])||'') eq 'HASH') {
+    my %map = %{shift(@directives)};
+    my %new_data;
+    foreach my $key (keys %map) {
+      my %sub_data_spec = $self->parse_data_spec($map{$key});
+      my $value = $self->_value_from_data($data, %sub_data_spec);
+      $new_data{$key} = $value;
+    }
+    $data = Template::Pure::DataContext->new(\%new_data);
+  }
+
+  return ($data, @directives);
+}
+
+sub _process_sub_data {
+  my ($self, $dom, $data, $css, %action) = @_;
+  my ($sub_data_proto, $sub_data_action) = %action;
+  if(ref \$sub_data_proto eq 'SCALAR') {
+    my %sub_data_spec = $self->parse_data_spec($sub_data_proto);  
+    my $value = $self->_value_from_data($data, %sub_data_spec);
+    ## TODO: Allow fro $sub_data_proto to be a template object
+    die "Action for '$sub_data_proto' must be an arrayref of new directives"
+      unless ref $sub_data_action eq 'ARRAY';
+    $self->process_sub_directives($dom, $value, $css, @{$sub_data_action});
+  } else {
+    die "Not sure how to process $sub_data_proto...";
+  }
+}
+
+sub process_sub_directives {
+  my ($self, $dom, $data, $css, @directives) = @_;
+  if($css eq '.') {
+    $self->_process_dom_recursive($data, $dom, @directives);
+  } else {
+    my $collection = $dom->find($css);
+    $collection->each(sub {
+        $self->_process_dom_recursive($data, $_, @directives);
+    });
+  }
+}
+
+sub _value_from_dom {
+  my ($self, $dom, $spec) = @_;
+  my %match_spec = $self->parse_match_spec($spec);
+
+  $dom = $dom->root if $match_spec{absolute};
+
+  ## TODO, perhaps this could do a find instead of at and return
+  ## a collection, which populates an iterator if requested?
+
+  if($match_spec{target} eq 'content') {
+    return $self->at_or_die($dom, $match_spec{css})->content;
+  } elsif($match_spec{target} eq 'node') {
+    return $self->at_or_die($dom, $match_spec{css})->to_string;
+  } elsif(my $attr = ${$match_spec{target}}) {
+    return $self->at_or_die($dom, $match_spec{css})->attr($attr);
+  }
+}
+
+sub _value_from_data {
+  my ($self, $data, %data_spec) = @_;
+  my $value = $data->at(%data_spec)->value;
+  foreach my $filter (@{$data_spec{filters}}) {
+    $value = $self->_apply_data_filter($value, $data, $filter);
+  }
+  return $value;
+}
+
+sub _apply_data_filter {
+  my ($self, $value, $data, $filter) = @_;
+  my ($name, @args) = @$filter;
+  @args = map { ref $_ ? $self->_value_from_data($data, %$_) : $_ } @args;
+  return $self->filter($name, $value, @args);
+}
+
+sub _process_dom_filter {
+  my ($self, $dom, $data, $css, $cb) = @_;
+  if($css eq '.') {
+    $cb->($self, $dom, $data);
+  } else {
+    my $collection = $dom->find($css);
+    $collection->each(sub {
+      $cb->($self, $dom, $data);
+    });
+  }
+}
+
+sub _process_match_spec {
+  my ($self, $dom, $value, %match_spec) = @_;
+  if($match_spec{css} eq '.') {
+    $self->_process_mode($dom, $value, %match_spec);
+  } else {
+    my $collection = $dom->find($match_spec{css});
+    $collection->each(sub {
+      $self->_process_mode($_, $value, %match_spec);
+    });
+  }
+}
+
+sub _process_mode {
+  my ($self, $dom, $value, %match_spec) = @_;
+
+  my $mode = $match_spec{mode};
+  my $target = $match_spec{target};
+  my $safe_value = $self->escape_html($value);
+
+  if($mode eq 'replace') {
+    if($target eq 'content') {
+      $dom->content($safe_value);
+    } elsif($target eq 'node') {
+      $dom->replace($safe_value);
+    } elsif(my $attr = $$target) {
+      $dom->attr($attr=>$safe_value);
+    } else {
+      die "Don't understand target of $target";
+    }
+  } elsif($mode eq 'append') {
+    if($target eq 'content') {
+      $dom->append_content($safe_value);
+    } elsif($target eq 'node') {
+      $dom->append($safe_value);
+    } elsif(my $attr = $$target) {
+      my $current_attr = $dom->attr($attr)||'';
+      $dom->attr($attr=>"$current_attr$safe_value" );
+    } else {
+      die "Don't understand target of $target";
+    }
+  } elsif($mode eq 'prepend') {
+    if($target eq 'content') {
+      $dom->prepend_content($safe_value);
+    } elsif($target eq 'node') {
+      $dom->prepend($safe_value);
+    } elsif(my $attr = $$target) {
+      my $current_attr = $dom->attr($attr)||'';
+      $dom->attr($attr=> "$safe_value$current_attr" );
+    } else {
+      die "Don't understand target of $target";
+    }
+  } else {
+    die "Not sure how to handle mode '$mode'";
+  }
+}
+
+
+sub filter {
+  my ($self, $name, $data, @args) = @_;
+  my %filters = (
+    $self->default_filters,
+    %{$self->{filters}}
+  );
+  
+  my $filter = $filters{$name} ||
+    die "Filter $name does not exist";
+    
+  return $filter->($self, $data, @args);
+}
+
 
 
 1;
@@ -531,7 +761,7 @@ as described below.  For example consider re-writing the above example like this
       ]
     );
 
-=head Arrayref - Run directives under a new DOM root
+=head2 Arrayref - Run directives under a new DOM root
 
 Somtimes its handy to group a set of directives under a given node.  For example:
 
@@ -622,54 +852,6 @@ Results in:
       <dt>Email</dt>
       <dd class='email'>jjnapiork@cpan.org'</dd>
     </dl>
-
-=head2 Hashref - Remap or replace the current data context
-
-Sometimes you wish to build an altered or new data context.
-
-    my $html = qq[
-      <dl id='contact'>
-        <dt>Phone</dt>
-        <dd class='phone'>(xxx) xxx-xxxx</dd>
-        <dt>Email</dt>
-        <dd class='email'>aaa@email.com</dd>
-      </dl>
-    ];
-
-    my $pure = Template::Pure->new(
-      template = $html,
-      directives => [
-        '#contact' => {
-          { 
-            phone => 'contact.phone',
-            email => 'contact.email,
-          },  [
-          '.phone' => 'phone',
-          '.email' => 'email',
-          ],
-        },
-      ]
-    );
-
-    my %data = (
-      contact => {
-        phone => '(212) 387-9509',
-        email => 'jjnapiork@cpan.org',
-      }
-    );
-
-    print $pure->render(\%data);
-
-Results in:
-
-    <dl id='contact'>
-      <dt>Phone</dt>
-      <dd class='phone'>(212) 387-9509</dd>
-      <dt>Email</dt>
-      <dd class='email'>jjnapiork@cpan.org'</dd>
-    </dl>
-
-
 
 =head2 Hashref - Create a Loop
 
@@ -1224,6 +1406,56 @@ current path with '/' and '../'.  Using '../' moves you up one level
 (returns you to the preview path) while using '/' moves you back to the root
 context.  Both these are only in effect for the action that is using them.
 
+=head2 Remapping Your Data Context
+
+If the first element of your directives (either at the root of the directives
+or when you create a new directives list under a given node) is a hashref
+we take that as special instructions to remap the current data context to
+a different structure.  Useful for increase reuse and decreasing complexity
+in some situations:
+
+    my $html = qq[
+      <dl id='contact'>
+        <dt>Phone</dt>
+        <dd class='phone'>(xxx) xxx-xxxx</dd>
+        <dt>Email</dt>
+        <dd class='email'>aaa@email.com</dd>
+      </dl>
+    ];
+
+    my $pure = Template::Pure->new(
+      template = $html,
+      directives => [
+        '#contact' => [
+          { 
+            phone => 'contact.phone',
+            email => 'contact.email,
+          },  [
+          '.phone' => 'phone',
+          '.email' => 'email',
+          ],
+        },
+      ]
+    );
+
+    my %data = (
+      contact => {
+        phone => '(212) 387-9509',
+        email => 'jjnapiork@cpan.org',
+      }
+    );
+
+    print $pure->render(\%data);
+
+Results in:
+
+    <dl id='contact'>
+      <dt>Phone</dt>
+      <dd class='phone'>(212) 387-9509</dd>
+      <dt>Email</dt>
+      <dd class='email'>jjnapiork@cpan.org'</dd>
+    </dl>
+
 =head2 Using Placeholders in your Actions
 
 Sometimes it makes sense to compose your replacement value of several
@@ -1234,7 +1466,7 @@ example:
     my $pure = Template::Pure->new(
       template => $html,
       directives => [
-        '#content' => 'Hi #{name}, glad to meet you on #{today}',
+        '#content' => 'Hi ={name}, glad to meet you on=#{today}',
       ]
     );
 
@@ -1245,7 +1477,7 @@ paths can be simple or complex, and even contain filters:
     my $pure = Template::Pure->new(
       template => $html,
       directives => [
-        '#content' => 'Hi #{name | uc}, glad to meet you on #{today}',
+        '#content' => 'Hi ={name | uc}, glad to meet you on ={today}',
       ]
     );
 
@@ -1338,7 +1570,15 @@ space if there is an existing since that is expected).
 
 =item '^': Replace current node completely
 
+Normally we replace, append or prepend to the value of the selected node.  Using the
+'^' at the front of your match indicates operation should happen on the entire node,
+not just the value.  Can be combined with '+' for append/prepend.
+
 =item '|': Run a filter on the current node
+
+Passed the currently selected node to a code reference.  You can run L<DOM::Tiny>
+transforms on the entire selected node.  Nothing should be returned from this 
+coderef.
 
     'body|' => sub {
       my ($template, $dom, $data) = @_;

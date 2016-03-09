@@ -8,21 +8,21 @@ sub template { [ Template::Pure::Utils::parse_data_template(shift) ] }
 sub itr { +{ Template::Pure::Utils::parse_itr_spec(shift) } }
 
 # Test cases for match spec parsing
-is_deeply match('title'), +{mode=>'replace', css=>'title', target=>'content'};
-is_deeply match('^title'), +{mode=>'replace', css=>'title', target=>'node'};
-is_deeply match('+title'), +{mode=>'prepend', css=>'title', target=>'content'};
-is_deeply match('title+'), +{mode=>'append', css=>'title', target=>'content'};
-is_deeply match('^+title'), +{mode=>'prepend', css=>'title', target=>'node'};
-is_deeply match('^title+'), +{mode=>'append', css=>'title', target=>'node'};
-is_deeply match('a@href'), +{mode=>'replace', css=>'a', target=>\'href'};
-is_deeply match('+a@href'), +{mode=>'prepend', css=>'a', target=>\'href'};
-is_deeply match('a@href+'), +{mode=>'append', css=>'a', target=>\'href'};
-is_deeply match('a#link@href'), +{mode=>'replace', css=>'a#link', target=>\'href'};
-is_deeply match('+a#link@href'), +{mode=>'prepend', css=>'a#link', target=>\'href'};
-is_deeply match('a#link@href+'), +{mode=>'append', css=>'a#link', target=>\'href'};
-is_deeply match('@href'), +{mode=>'replace', css=>'.', target=>\'href'};
-is_deeply match('^.'), +{mode=>'replace', css=>'.', target=>'node'};
-is_deeply match('html|'), +{mode=>'filter', css=>'html', target=>''};
+is_deeply match('title'), +{mode=>'replace', css=>'title', target=>'content', absolute=>''};
+is_deeply match('^title'), +{mode=>'replace', css=>'title', target=>'node', absolute=>''};
+is_deeply match('+title'), +{mode=>'prepend', css=>'title', target=>'content', absolute=>''};
+is_deeply match('title+'), +{mode=>'append', css=>'title', target=>'content', absolute=>''};
+is_deeply match('^+title'), +{mode=>'prepend', css=>'title', target=>'node', absolute=>''};
+is_deeply match('^title+'), +{mode=>'append', css=>'title', target=>'node', absolute=>''};
+is_deeply match('a@href'), +{mode=>'replace', css=>'a', target=>\'href', absolute=>''};
+is_deeply match('+a@href'), +{mode=>'prepend', css=>'a', target=>\'href', absolute=>''};
+is_deeply match('a@href+'), +{mode=>'append', css=>'a', target=>\'href', absolute=>''};
+is_deeply match('a#link@href'), +{mode=>'replace', css=>'a#link', target=>\'href', absolute=>''};
+is_deeply match('+a#link@href'), +{mode=>'prepend', css=>'a#link', target=>\'href', absolute=>''};
+is_deeply match('a#link@href+'), +{mode=>'append', css=>'a#link', target=>\'href', absolute=>''};
+is_deeply match('@href'), +{mode=>'replace', css=>'.', target=>\'href', absolute=>''};
+is_deeply match('^.'), +{mode=>'replace', css=>'.', target=>'node', absolute=>''};
+is_deeply match('html|'), +{mode=>'filter', css=>'html', target=>'', absolute=>''};
 
 # Test case for data path parsing
 is_deeply data('aaa.bbb'), +{

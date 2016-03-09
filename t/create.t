@@ -1,5 +1,6 @@
 use Test::Most;
 use Template::Pure;
+use DOM::Tiny;
 
 ok my $html = qq[
   <html>
@@ -16,13 +17,16 @@ ok my $pure = Template::Pure->new(
   directives=> [
     'title' => 'meta.title',
     'body' => 'content',
-    },
   ]
 );
 
+ok $pure->{dom};
+ok $pure->{directives};
+ok $pure->{filters};
+
 ok my $data = +{
   meta => {
-    title=>'My Title',
+    title=>'Doomed Poem',
     author=>'jnap',
   },
   content => q[
@@ -32,7 +36,10 @@ ok my $data = +{
   ],
 };
 
+ok my $string = $pure->render($data);
+ok my $dom = DOM::Tiny->new($string);
+
+is $dom->at('title'), '<title>Doomed Poem</title>';
+like $dom->at('body'), qr/Are you doomed to discover that/;
+
 done_testing;
-
-
-

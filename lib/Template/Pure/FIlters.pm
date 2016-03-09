@@ -7,6 +7,31 @@ use Data::Dumper ();
 use URI::Escape ();
 use Template::Pure::EncodedString;
 
+sub all {
+  return (
+    format => \&format,
+    strftime => \&strftime,
+    dump => \&dump,
+    uri_escape_utf8 => \&uri_escape_utf8,
+    uri_escape => \&uri_escape,
+    upper => \&upper,
+    lower => \&lower,
+    upper_first => \&upper_first,
+    lower_first => \&lower_first,
+    collapse => \&collapse,
+    encoded_string => \&encoded_string,
+    truncate => \&truncate,
+    repeat => \&repeat,
+    remove => \&remove,
+    replace => \&replace,
+    comma => \&comma,
+    ltrim => \&ltrim,
+    rtrim => \&rtrim,
+    trim => \&trim,
+    default => \&default,
+  );
+}
+
 sub format {
   my ($template, $data, $format) = @_;
   return sprintf($format, $data);
@@ -45,12 +70,12 @@ sub uri_escape_utf8 {
 
 sub upper {
   my ($template, $data) = @_;
-  return lc $data;
+  return uc $data;
 }
 
 sub lower {
   my ($template, $data) = @_;
-  return uc $data;
+  return lc $data;
 }
 
 sub upper_first {
@@ -123,7 +148,7 @@ sub rtrim {
 
 sub trim {
   my ($template, $data) = @_;
-  $data =~s/^\s+|\s+$//;
+  $data =~s/^\s+|\s+$//g;
   return $data;
 }
 
