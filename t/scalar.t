@@ -24,7 +24,8 @@ ok my $html = qq[
         <p class="prepend">:prepend</p>
         <p class="replace">append</p>
       </div>
-
+      <div id='dom'>...
+      </dom>
     </body>
   </html>
 ];
@@ -65,7 +66,9 @@ ok my $pure = Template::Pure->new(
       my ($template, $dom, $data) = @_;
       return 'bar';
     },
-
+    'body' => [
+      'div#dom' => \'^/title',
+    ],
   ]
 );
 
@@ -131,6 +134,10 @@ is $dom->at('title')->content, 'DOO...';
   is $node->at('.append'), '<p class="append">append:</p>';
   is $node->at('.prepend'), '<p class="prepend">:prepend</p>';
   is $node->at('.replace'), '<p class="replace">node-replace</p>';
+}
+
+{
+  is $dom->at('#dom')->content, '<title>DOO...</title>';
 }
 
 done_testing;

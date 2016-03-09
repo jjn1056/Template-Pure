@@ -4,9 +4,11 @@ use warnings;
 package Template::Pure;
 
 use DOM::Tiny;
+use Scalar::Util;
 use Template::Pure::Utils;
 use Template::Pure::Filters;
 use Template::Pure::DataContext;
+use Template::Pure::DataProxy;
 use Template::Pure::EncodedString;
 
 sub new {
@@ -50,20 +52,7 @@ sub _process_dom_recursive {
   my ($self, $data_proto, $dom, @directives) = @_;
   my $data = Template::Pure::DataContext->new($data_proto);
 
-  ($data, @directives) = $self->_process_directive_instructions($data, @directives);
-
-  # If the first directive is a HashRef, that's a request to build an
-  # new $data object.
-  if( (ref($directives[0])||'') eq 'HASH') {
-    my %map = %{shift(@directives)};
-    my %new_data;
-    foreach my $key (keys %map) {
-      my %sub_data_spec = $self->parse_data_spec($map{$key});
-      my $value = $self->_value_from_data($data, %sub_data_spec);
-      $new_data{$key} = $value;
-    }
-    $data = Template::Pure::DataContext->new(\%new_data);
-  }
+  ($data, @directives) = $self->_process_directive_instructions($dom, $data, @directives);
 
   while(@directives) {
     my %match_spec = $self->parse_match_spec (shift @directives);
@@ -73,35 +62,53 @@ sub _process_dom_recursive {
 
     if($match_spec{mode} eq 'filter') {
       $self->_process_dom_filter($dom, $data, $match_spec{css}, $action_proto);
-    } elsif(ref \$action_proto eq 'SCALAR') {
-      my %data_spec = $self->parse_data_spec($action_proto);
-      my $value = $self->_value_from_data($data, %data_spec);
-      $self->_process_match_spec($dom, $value, %match_spec);
-    } elsif((ref($action_proto)||'') eq 'SCALAR') {
-      my $value = $self->_value_from_dom($dom, $$action_proto);
-      $self->_process_match_spec($dom, $value, %match_spec);
-    } elsif((ref($action_proto)||'') eq 'ARRAY') {
-        $self->process_sub_directives($dom, $data->value, $match_spec{css}, @{$action_proto});
-     } elsif((ref($action_proto)||'') eq 'CODE') {
-      my $value = $action_proto->($self, $dom, $data);
-      $self->_process_match_spec($dom, $value, %match_spec);
     } elsif((ref($action_proto)||'') eq 'HASH') {
-      # Could be data localize, data remap or iterator
+      # Could be data remap or iterator
       $self->_process_sub_data($dom, $data, $match_spec{css}, %{$action_proto});
+    } elsif((ref($action_proto)||'') eq 'ARRAY') {
+      $self->process_sub_directives($dom, $data->value, $match_spec{css}, @{$action_proto});
+    } else {
+      my $value = $self->_value_from_action_proto($dom, $data, $action_proto, %match_spec);
+      $self->_process_match_spec($dom, $value, %match_spec);
     }
   }
 
   return $dom;
 }
 
+sub _value_from_action_proto {
+  my ($self, $dom, $data, $action_proto, %match_spec) = @_;
+  if(ref \$action_proto eq 'SCALAR') {
+    my %data_spec = $self->parse_data_spec($action_proto);
+    return $self->_value_from_data($data, %data_spec);
+  } elsif((ref($action_proto)||'') eq 'SCALAR') {
+    return $self->_value_from_dom($dom, $$action_proto);
+  } elsif((ref($action_proto)||'') eq 'CODE') {
+    return $action_proto->($self, $dom, $data);
+  } elsif(Scalar::Util::blessed($action_proto) && $action_proto->isa(ref $self)) {
+    return $self->_process_template_obj($dom, $data, $action_proto, %match_spec);
+  } else {
+    die "I encountered an action I don't know what to do with: $action_proto";
+  }
+}
+
+sub _process_template_obj {
+  my ($self, $dom, $data, $template, %match_spec) = @_;
+  my $content = $self->_value_from_dom($dom, \%match_spec);
+  my $new_data = Template::Pure::DataProxy->new(
+    $data->value,
+    content => $self->encoded_string($content));
+      
+  return $self->encoded_string($template->render($new_data));
+}
+
 sub _process_directive_instructions {
-  my ($self, $data, @directives) = @_;
+  my ($self, $dom, $data, @directives) = @_;
   if( (ref($directives[0])||'') eq 'HASH') {
     my %map = %{shift(@directives)};
     my %new_data;
     foreach my $key (keys %map) {
-      my %sub_data_spec = $self->parse_data_spec($map{$key});
-      my $value = $self->_value_from_data($data, %sub_data_spec);
+      my $value = $self->_value_from_action_proto($dom, $data, $map{$key});
       $new_data{$key} = $value;
     }
     $data = Template::Pure::DataContext->new(\%new_data);
@@ -138,8 +145,9 @@ sub process_sub_directives {
 }
 
 sub _value_from_dom {
-  my ($self, $dom, $spec) = @_;
-  my %match_spec = $self->parse_match_spec($spec);
+  my $self = shift;
+  my $dom = shift;
+  my %match_spec = ref $_[0] ? %{$_[0]} : $self->parse_match_spec($_[0]);
 
   $dom = $dom->root if $match_spec{absolute};
 
@@ -149,7 +157,11 @@ sub _value_from_dom {
   if($match_spec{target} eq 'content') {
     return $self->at_or_die($dom, $match_spec{css})->content;
   } elsif($match_spec{target} eq 'node') {
-    return $self->at_or_die($dom, $match_spec{css})->to_string;
+    ## When we want a full node, with HTML tags, we encode the string
+    ## since I presume they want a copy not escaped.  T 'think' this is
+    ## the commonly desired thing and you can always apply and escape_html filter
+    ## yourself when you don't want it.
+    return $self->encoded_string($self->at_or_die($dom, $match_spec{css})->to_string);
   } elsif(my $attr = ${$match_spec{target}}) {
     return $self->at_or_die($dom, $match_spec{css})->attr($attr);
   }
@@ -1596,6 +1608,12 @@ coderef.
 You may use processing instructions in your template to indicate setup values
 
 <?pure-directives ?>
+
+=head1 IMPORTANT NOTE REGARDING VALID HTML
+
+Please note that L<DOM::Tiny> tends to enforce rule regarding valid HTML5.  For example, you
+cannot nest a block level element inside a 'P' element.  This might at time lead to some
+surprising results in your output.
 
 =head1 AUTHOR
  

@@ -6,6 +6,7 @@ use Scalar::Util ();
 use Data::Dumper ();
 use URI::Escape ();
 use Template::Pure::EncodedString;
+use Template::Pure::Utils;
 
 sub all {
   return (
@@ -20,6 +21,7 @@ sub all {
     lower_first => \&lower_first,
     collapse => \&collapse,
     encoded_string => \&encoded_string,
+    escape_html => \&escape_html,
     truncate => \&truncate,
     repeat => \&repeat,
     remove => \&remove,
@@ -31,6 +33,8 @@ sub all {
     default => \&default,
   );
 }
+
+sub escape_html { Template::Pure::Utils::escape_html($_[1]) }
 
 sub format {
   my ($template, $data, $format) = @_;
@@ -333,6 +337,14 @@ By default L<Template::Pure> escapes your values using a simple HTML escape func
 output is 'safe' from HTML injection attacks.  However there might be cases when you wish to all raw
 HTML to be injected into your template, froom known, safe data.  In this case you can use this function
 to mark your data as "don't encode".  We will assume you know what you are doing... 
+
+=head2 escape_html
+
+As mentioned in the previous filter documentation, we nearly always automatically escape your data values
+when they get rendered into your template to produce a document.  However as also mentioned there are
+a few case where we don't, since we think its the more common desired behavior, such as when you
+are injecting a template object or you are setting the value from the contents of a different node inside
+the same template.  In those cases, should HTML escaping be desired you can use this filter to make it so.
 
 =head2 truncate ($length, $affix)
 
