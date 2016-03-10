@@ -46,7 +46,6 @@ ok my $page_html = q[
   </html>
 ];
 
-
 ok my $page = Template::Pure->new(
   template=>$page_html,
   directives=> [
@@ -69,8 +68,6 @@ ok my $data = +{
 
 ok my $string = $page->render($data);
 ok my $dom = DOM::Tiny->new($string);
-
-warn $string;
 
 is $dom->at('title')->content, 'Inner Stuff';
 is $dom->at('#foot')->content, 'Here&#39;s the footer';

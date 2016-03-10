@@ -38,6 +38,7 @@ sub process_dom {
 sub default_filters { Template::Pure::Filters->all }
 sub parse_match_spec { Template::Pure::Utils::parse_match_spec($_[1]) }
 sub parse_data_spec { Template::Pure::Utils::parse_data_spec($_[1]) }
+sub parse_data_template { Template::Pure::Utils::parse_data_template($_[1]) }
 sub escape_html { Template::Pure::Utils::escape_html($_[1]) }
 sub encoded_string { Template::Pure::EncodedString->new($_[1]) }
 
@@ -79,8 +80,7 @@ sub _process_dom_recursive {
 sub _value_from_action_proto {
   my ($self, $dom, $data, $action_proto, %match_spec) = @_;
   if(ref \$action_proto eq 'SCALAR') {
-    my %data_spec = $self->parse_data_spec($action_proto);
-    return $self->_value_from_data($data, %data_spec);
+    return $self->_value_from_scalar_action($data, $action_proto);
   } elsif((ref($action_proto)||'') eq 'SCALAR') {
     return $self->_value_from_dom($dom, $$action_proto);
   } elsif((ref($action_proto)||'') eq 'CODE') {
@@ -89,6 +89,34 @@ sub _value_from_action_proto {
     return $self->_process_template_obj($dom, $data, $action_proto, %match_spec);
   } else {
     die "I encountered an action I don't know what to do with: $action_proto";
+  }
+}
+
+sub _value_from_scalar_action {
+  my ($self, $data, $action_proto) = @_;
+
+  ## If a $action_proto contains a ={ with no | first OR it contains a ={ and no |
+  ## That means it is a string with placeholders
+
+  my $first_pipe = index($action_proto, '|');
+  my $first_open = index($action_proto, '={');
+  
+  if(
+    (
+      ($first_open >= 0) &&
+      ($first_open < $first_pipe)
+    ) || (
+      ($first_open >= 0) &&
+      ($first_pipe == -1)
+    )
+  ) {
+    my @parts = map { 
+      ref $_ ? $self->_value_from_data($data, %$_) : $_; 
+    } $self->parse_data_template($action_proto);
+    return join('', @parts);
+  } else {
+    my %data_spec = $self->parse_data_spec($action_proto);
+    return $self->_value_from_data($data, %data_spec);
   }
 }
 
@@ -108,12 +136,10 @@ sub _process_directive_instructions {
     my %map = %{shift(@directives)};
     my %new_data;
     foreach my $key (keys %map) {
-      my $value = $self->_value_from_action_proto($dom, $data, $map{$key});
-      $new_data{$key} = $value;
+      $new_data{$key} = $self->_value_from_action_proto($dom, $data, $map{$key});
     }
     $data = Template::Pure::DataContext->new(\%new_data);
   }
-
   return ($data, @directives);
 }
 
@@ -148,6 +174,10 @@ sub _value_from_dom {
   my $self = shift;
   my $dom = shift;
   my %match_spec = ref $_[0] ? %{$_[0]} : $self->parse_match_spec($_[0]);
+
+  use Devel::Dwarn;
+  Dwarn '..........';
+  Dwarn \%match_spec;
 
   $dom = $dom->root if $match_spec{absolute};
 

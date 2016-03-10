@@ -30,7 +30,8 @@ sub data_context { Template::Pure::DataContext->new(shift) }
 
 
   #is $c->at( parse_data 'optional:boo'), undef;
-
+  die "Test unfinished, not doing optional maybe right";
+  
   use Devel::Dwarn;
   Dwarn $c->at( parse_data 'optional:boo')->value;
 
