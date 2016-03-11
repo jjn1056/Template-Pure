@@ -12,9 +12,10 @@ ok my $html = q[
         <li><span>stuff</span>extra stuff</li>
       </ul>
       <ol>
-        <li>stuff</li>
+        <li>
+          stuff
+        </li>
       </ol>
-
     </body>
   </html>
 ];
@@ -29,7 +30,10 @@ ok my $pure = Template::Pure->new(
     },
     'ol li' => {
       'person<-people' => [
-        '.' => '={person} ={i.index}',
+        '.' => '={person |
+          upper | 
+          repeat(6) | 
+          truncate(={/settings.length}) } ={i.index}',
       ],
       'order_by' => sub {
         my ($data, $a, $b) = @_;
@@ -43,6 +47,9 @@ ok my $pure = Template::Pure->new(
 );
 
 ok my $data = +{
+  settings => {
+    length => 10,
+  },
   people => [qw/john jack jane/],
 };
 
@@ -52,9 +59,7 @@ ok my $dom = DOM::Tiny->new($string);
 is $dom->find('ul li')->[0]->content, '<span>john</span>extra stuff';
 is $dom->find('ul li')->[1]->content, '<span>jack</span>extra stuff';
 is $dom->find('ul li')->[2]->content, '<span>jane</span>extra stuff';
-is $dom->find('ol li')->[0]->content, 'jane 1';
-is $dom->find('ol li')->[1]->content, 'jack 2';
-
-warn $string;
+is $dom->find('ol li')->[0]->content, 'JANEJANEJA 1';
+is $dom->find('ol li')->[1]->content, 'JACKJACKJA 2';
 
 done_testing; 
