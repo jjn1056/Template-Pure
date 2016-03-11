@@ -19,7 +19,7 @@ sub escape_html {
   ) {
     return $value;
   } else {
-    $value =~ s/([&><"'])/$_escape_table{$1}/ge; 
+    $value =~ s/([&><"'])/$_escape_table{$1}/ge unless !defined($value);
     return $value;
   }
 }

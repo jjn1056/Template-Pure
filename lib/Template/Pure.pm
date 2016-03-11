@@ -10,6 +10,7 @@ use Template::Pure::Filters;
 use Template::Pure::DataContext;
 use Template::Pure::DataProxy;
 use Template::Pure::EncodedString;
+use Template::Pure::Iterator;
 
 sub new {
   my ($proto, %args) = @_;
@@ -39,6 +40,7 @@ sub default_filters { Template::Pure::Filters->all }
 sub parse_match_spec { Template::Pure::Utils::parse_match_spec($_[1]) }
 sub parse_data_spec { Template::Pure::Utils::parse_data_spec($_[1]) }
 sub parse_data_template { Template::Pure::Utils::parse_data_template($_[1]) }
+sub parse_itr_spec { Template::Pure::Utils::parse_itr_spec($_[1]) } 
 sub escape_html { Template::Pure::Utils::escape_html($_[1]) }
 sub encoded_string { Template::Pure::EncodedString->new($_[1]) }
 
@@ -145,16 +147,49 @@ sub _process_directive_instructions {
 
 sub _process_sub_data {
   my ($self, $dom, $data, $css, %action) = @_;
+
+  # Pull out any sort or filters
+  my $sort_cb = exists $action{order_by} ? delete $action{order_by} : undef;
+  my $filter_cb = exists $action{filter} ? delete $action{filter} : undef;
+
   my ($sub_data_proto, $sub_data_action) = %action;
-  if(ref \$sub_data_proto eq 'SCALAR') {
+
+  ## TODO: Allow fro $sub_data_proto to be a template object
+  die "Action for '$sub_data_proto' must be an arrayref of new directives"
+    unless ref $sub_data_action eq 'ARRAY';
+
+  if(index($sub_data_proto,'<-')) {
+    my ($new_key, $itr_data_spec) = $self->parse_itr_spec($sub_data_proto);
+    my $itr_data_proto = $self->_value_from_data($data, %$itr_data_spec);
+
+    my $iterator = Template::Pure::Iterator->from_proto($itr_data_proto, $sort_cb, $filter_cb,);
+    
+    if($css eq '.') {
+      $self->_process_iterator($dom, $new_key, $iterator, @{$sub_data_action});
+    } else {
+      my $collection = $dom->find($css);
+      $collection->each(sub {
+        $self->_process_iterator($_, $new_key, $iterator, @{$sub_data_action});
+      });
+    }
+  } else {
     my %sub_data_spec = $self->parse_data_spec($sub_data_proto);  
     my $value = $self->_value_from_data($data, %sub_data_spec);
-    ## TODO: Allow fro $sub_data_proto to be a template object
-    die "Action for '$sub_data_proto' must be an arrayref of new directives"
-      unless ref $sub_data_action eq 'ARRAY';
     $self->process_sub_directives($dom, $value, $css, @{$sub_data_action});
-  } else {
-    die "Not sure how to process $sub_data_proto...";
+  }
+}
+
+sub _process_iterator {
+  my ($self, $dom, $key, $iterator, @actions) = @_; 
+  my $new_dom = DOM::Tiny->new($dom);
+  while(my $datum = $iterator->next) {
+    my $new_data = +{
+      $key => $datum, 
+      i => $iterator,
+    };
+    $self->_process_dom_recursive($new_data, $new_dom->descendant_nodes->[0], @actions);
+    $dom->replace($new_dom); #Not sure why this is actually working....
+    #$iterator->is_first ? $dom->replace($new_dom) : $dom->append($new_dom);
   }
 }
 
@@ -174,10 +209,6 @@ sub _value_from_dom {
   my $self = shift;
   my $dom = shift;
   my %match_spec = ref $_[0] ? %{$_[0]} : $self->parse_match_spec($_[0]);
-
-  use Devel::Dwarn;
-  Dwarn '..........';
-  Dwarn \%match_spec;
 
   $dom = $dom->root if $match_spec{absolute};
 
@@ -246,7 +277,7 @@ sub _process_mode {
 
   if($mode eq 'replace') {
     if($target eq 'content') {
-      $dom->content($safe_value);
+      $dom->content($safe_value) unless !defined($safe_value);
     } elsif($target eq 'node') {
       $dom->replace($safe_value);
     } elsif(my $attr = $$target) {
