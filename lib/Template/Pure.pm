@@ -158,7 +158,7 @@ sub _process_sub_data {
   die "Action for '$sub_data_proto' must be an arrayref of new directives"
     unless ref $sub_data_action eq 'ARRAY';
 
-  if(index($sub_data_proto,'<-')) {
+  if(index($sub_data_proto,'<-') > 0) {
     my ($new_key, $itr_data_spec) = $self->parse_itr_spec($sub_data_proto);
     my $itr_data_proto = $self->_value_from_data($data, %$itr_data_spec);
 

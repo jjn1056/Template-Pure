@@ -29,7 +29,7 @@ ok my $pure = Template::Pure->new(
     },
     'ol li' => {
       'person<-people' => [
-        '.' => 'person',
+        '.' => '={person} ={i.index}',
       ],
       'order_by' => sub {
         my ($a, $b) = @_;
@@ -52,7 +52,9 @@ ok my $dom = DOM::Tiny->new($string);
 is $dom->find('ul li')->[0]->content, '<span>john</span>extra stuff';
 is $dom->find('ul li')->[1]->content, '<span>jack</span>extra stuff';
 is $dom->find('ul li')->[2]->content, '<span>jane</span>extra stuff';
-is $dom->find('ol li')->[0]->content, 'jane';
-is $dom->find('ol li')->[1]->content, 'jack';
+is $dom->find('ol li')->[0]->content, 'jane 1';
+is $dom->find('ol li')->[1]->content, 'jack 2';
+
+warn $string;
 
 done_testing; 
