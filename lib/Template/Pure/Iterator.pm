@@ -45,7 +45,7 @@ sub from_object {
       },
       _reset => sub { $reset->() },
       _all => sub { return $all->() },
-      _is_first => sub { return $index-1 == 0 ? 1:0 },
+      _is_first => sub { return (($index - 1) == 0 ? 1:0) },
       _is_last => sub { return $index == $count->() ? 1:0 },
       _is_even => sub { return $index % 2 ? 0:1 },
       _is_odd => sub { return $index % 2 ? 1:0 },

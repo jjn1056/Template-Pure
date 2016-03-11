@@ -23,17 +23,18 @@ sub new {
 }
 
 sub render {
-  my ($self, $data_proto) = @_;
-  return $self->process_dom($data_proto)->to_string;
+  my ($self, $data_proto, $extra_directives) = @_;
+  return $self->process_dom($data_proto, $extra_directives)->to_string;
 }
 
 sub process_dom {
-  my ($self, $data_proto) = @_;
+  my ($self, $data_proto, $extra_directives) = @_;
   return $self->_process_dom_recursive(
     $data_proto,
     $self->{dom},
     @{$self->{directives}},
-    );
+    @{$extra_directives||[]},
+  );
 }
 
 sub default_filters { Template::Pure::Filters->all }
@@ -76,7 +77,7 @@ sub _process_dom_recursive {
       $self->_process_dom_filter($dom, $data, $match_spec{css}, $action_proto);
     } elsif((ref($action_proto)||'') eq 'HASH') {
       # Could be data remap or iterator
-      $self->_process_sub_data($dom, $data, $match_spec{css}, %{$action_proto});
+      $self->_process_sub_data($dom, $data, \%match_spec, %{$action_proto});
     } elsif((ref($action_proto)||'') eq 'ARRAY') {
       $self->process_sub_directives($dom, $data->value, $match_spec{css}, @{$action_proto});
     } else {
@@ -155,11 +156,18 @@ sub _process_directive_instructions {
 }
 
 sub _process_sub_data {
-  my ($self, $dom, $data, $css, %action) = @_;
+  my ($self, $dom, $data, $match_spec, %action) = @_;
 
+  # I don't know what it means to match repeat on attribes or append/prepent
+  # right now, so just doing match on the CSS and welcome specifications for
+  # this behavior.
+
+  my $css = $match_spec->{css};
+  
   # Pull out any sort or filters
   my $sort_cb = exists $action{order_by} ? delete $action{order_by} : undef;
   my $filter_cb = exists $action{filter} ? delete $action{filter} : undef;
+  my $options = exists $action{options} ? delete $action{options} : undef;
   my $following_directives = exists $action{directives} ? delete $action{directives} : undef;
 
   my ($sub_data_proto, $sub_data_action) = %action;
@@ -172,7 +180,15 @@ sub _process_sub_data {
     my ($new_key, $itr_data_spec) = $self->parse_itr_spec($sub_data_proto);
     my $itr_data_proto = $self->_value_from_data($data, %$itr_data_spec);
 
-    my $iterator = Template::Pure::Iterator->from_proto($itr_data_proto, $sort_cb, $filter_cb,);
+    ## For now if the found value is undef, we second it along ti be trimmed
+    ## this behavior might be tweaked as examples of usage arise, also for now
+    ## we just pass through an empty iterator instead of considering it undef
+    ## ie [] is not considered like undef for now...
+
+    return $self->_process_match_spec($dom, $itr_data_proto, %$match_spec)
+      if $self->_value_is_undef($itr_data_proto);
+
+    my $iterator = Template::Pure::Iterator->from_proto($itr_data_proto, $sort_cb, $filter_cb, $options);
     
     if($css eq '.') {
       $self->_process_iterator($dom, $new_key, $iterator, @{$sub_data_action});
@@ -286,6 +302,14 @@ sub _process_match_spec {
   }
 }
 
+sub _value_is_undef {
+  my ($self, $value) = @_;
+  return 1 if !defined($value);
+  return 1 if Scalar::Util::blessed($value) && $value->isa('Template::Pure::UndefObject');
+  return 0;
+}
+
+
 sub _process_mode {
   my ($self, $dom, $value, %match_spec) = @_;
 
@@ -293,9 +317,12 @@ sub _process_mode {
   my $target = $match_spec{target};
   my $safe_value = $self->escape_html($value);
 
+  ## This behavior may be tweaked in the future.
+  return $dom->remove if $self->_value_is_undef($safe_value);
+
   if($mode eq 'replace') {
     if($target eq 'content') {
-      $dom->content($safe_value) unless !defined($safe_value);
+      $dom->content($safe_value) unless $self->_value_is_undef($safe_value);
     } elsif($target eq 'node') {
       $dom->replace($safe_value);
     } elsif(my $attr = $$target) {
@@ -329,7 +356,6 @@ sub _process_mode {
     die "Not sure how to handle mode '$mode'";
   }
 }
-
 
 sub filter {
   my ($self, $name, $data, @args) = @_;

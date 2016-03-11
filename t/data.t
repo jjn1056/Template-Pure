@@ -26,14 +26,8 @@ sub data_context { Template::Pure::DataContext->new(shift) }
   is $c->at( parse_data 'title'), 'About Me';
   is $c->at( parse_data 'meta.name'), 'john';
   is $c->at( parse_data 'deep.aaa.bbb.ccc'), '100';
-  #is $c->at( parse_data 'deep.aaa.bbb.optional:eee'), undef;
-
-
-  #is $c->at( parse_data 'optional:boo'), undef;
-  die "Test unfinished, not doing optional maybe right";
-  
-  use Devel::Dwarn;
-  Dwarn $c->at( parse_data 'optional:boo')->value;
-
+  is $c->at( parse_data 'deep.aaa.bbb.optional:eee')->value, undef;
+  is $c->at( parse_data 'optional:boo')->value, undef;
 }
+
 done_testing;

@@ -10,6 +10,7 @@ use overload
   q{""} => sub { undef },
   'fallback' => 1;
  
+sub can { 1 } # probably evil...
 sub AUTOLOAD { shift }
  
 sub maybe {

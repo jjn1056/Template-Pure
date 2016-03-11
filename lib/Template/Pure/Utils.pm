@@ -19,7 +19,9 @@ sub escape_html {
   ) {
     return $value;
   } else {
-    $value =~ s/([&><"'])/$_escape_table{$1}/ge unless !defined($value);
+    $value =~ s/([&><"'])/$_escape_table{$1}/ge unless 
+      !defined($value) ||
+        (Scalar::Util::blessed($value) && $value->isa('Template::Pure::UndefObject'));
     return $value;
   }
 }

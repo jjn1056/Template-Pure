@@ -31,15 +31,16 @@ sub at {
       if($current->can($key)) {
         $current = $current->$key;
       } elsif($at->{optional}) {
-        $current = Template::Pure::UndefObject->maybe(undef);
+        $current = undef;
       } else {
+        use Devel::Dwarn; Dwarn $current;
         die "Missing path '$key'";
       }
     } elsif(ref $current eq 'HASH') {
       if(exists $current->{$key}) {
         $current = $current->{$key};
       } elsif($at->{optional}) {
-        $current = Template::Pure::UndefObject->maybe(undef);
+        $current = undef;
       } else {
         warn Dumper $at;
         die "Missing path '$key'";
