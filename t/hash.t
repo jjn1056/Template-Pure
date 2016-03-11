@@ -26,6 +26,9 @@ ok my $pure = Template::Pure->new(
         'dt' => 'property',
         'dd' => 'value',
       ],
+      directives => [
+        '.+' => 'value'
+      ]
     },
     'p' => [
       { age => 'meta.value' },

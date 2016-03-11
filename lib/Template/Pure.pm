@@ -44,6 +44,12 @@ sub parse_itr_spec { Template::Pure::Utils::parse_itr_spec($_[1]) }
 sub escape_html { Template::Pure::Utils::escape_html($_[1]) }
 sub encoded_string { Template::Pure::EncodedString->new($_[1]) }
 
+sub data_at_path {
+  my ($self, $data, $path) = @_;
+  my %data_spec = $self->parse_data_spec($path);
+  return $self->_value_from_data($data, %data_spec);
+}
+
 sub at_or_die {
   my ($self, $dom, $css) = @_;
   my $new = $dom->at($css);
@@ -151,6 +157,7 @@ sub _process_sub_data {
   # Pull out any sort or filters
   my $sort_cb = exists $action{order_by} ? delete $action{order_by} : undef;
   my $filter_cb = exists $action{filter} ? delete $action{filter} : undef;
+  my $following_directives = exists $action{directives} ? delete $action{directives} : undef;
 
   my ($sub_data_proto, $sub_data_action) = %action;
 
@@ -176,6 +183,11 @@ sub _process_sub_data {
     my %sub_data_spec = $self->parse_data_spec($sub_data_proto);  
     my $value = $self->_value_from_data($data, %sub_data_spec);
     $self->process_sub_directives($dom, $value, $css, @{$sub_data_action});
+  }
+
+  ## Todo... not sure if this is right or useful
+  if($following_directives) {
+    $self->process_sub_directives($dom, $data, $css, @{$following_directives});
   }
 }
 

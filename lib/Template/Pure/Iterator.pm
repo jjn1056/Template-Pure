@@ -68,7 +68,7 @@ sub from_hash {
   my @keys = defined $filter_cb ? grep { $filter_cb->($_, $hashref->{$_}) ? $_ : undef } keys %$hashref : keys %$hashref;
 
   if(defined $sort_cb) {
-    @keys = sort { $sort_cb->($a, $b) } @keys;
+    @keys = sort { $sort_cb->($hashref, $a, $b) } @keys;
   }
 
   my $index = 0;
@@ -101,7 +101,7 @@ sub from_array {
   my @array = defined $filter_cb ? grep { $filter_cb->($_) } @$arrayref : @$arrayref;
 
   if(defined $sort_cb) {
-    @array = sort { warn $a, $b; $sort_cb->($a, $b) } @array;
+    @array = sort { $sort_cb->($arrayref, $a, $b) } @array;
   }
 
   my $index = 0;

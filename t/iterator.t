@@ -32,7 +32,7 @@ ok my $pure = Template::Pure->new(
         '.' => '={person} ={i.index}',
       ],
       'order_by' => sub {
-        my ($a, $b) = @_;
+        my ($data, $a, $b) = @_;
         return $b cmp $a;
       },
       'filter' => sub {
