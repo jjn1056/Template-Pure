@@ -167,7 +167,7 @@ sub _process_sub_data {
   # Pull out any sort or filters
   my $sort_cb = exists $action{order_by} ? delete $action{order_by} : undef;
   my $filter_cb = exists $action{filter} ? delete $action{filter} : undef;
-  my $options = exists $action{options} ? delete $action{options} : undef;
+  my $display_fields = exists $action{display_fields} ? delete $action{display_fields} : undef;
   my $following_directives = exists $action{directives} ? delete $action{directives} : undef;
 
   my ($sub_data_proto, $sub_data_action) = %action;
@@ -188,7 +188,12 @@ sub _process_sub_data {
     return $self->_process_match_spec($dom, $itr_data_proto, %$match_spec)
       if $self->_value_is_undef($itr_data_proto);
 
-    my $iterator = Template::Pure::Iterator->from_proto($itr_data_proto, $sort_cb, $filter_cb, $options);
+    my %options;
+    if($display_fields) {
+      $options{display_fields} = $display_fields;
+    }
+
+    my $iterator = Template::Pure::Iterator->from_proto($itr_data_proto, $sort_cb, $filter_cb, \%options);
     
     if($css eq '.') {
       $self->_process_iterator($dom, $new_key, $iterator, @{$sub_data_action});
@@ -380,52 +385,93 @@ Template::Pure - Perlish Port of pure.js
 
     use Template::Pure;
 
-    my $html_string = qq[
+    my $html = q[
       <html>
         <head>
-          <title>Sample Title</title>
+          <title>Page Title</title>
         </head>
         <body>
-          <ul class='people'>
-            <li>Jane Grey
-              <ul class='friends'>
-                <li>John Doe</li>
-              </ul>
-            </li>
+          <section id="article">
+            <h1>Header</h1>
+            <div>Story</div>
+          </section>
+          <ul id="friendlist">
+            <li>Friends</li>
           </ul>
         </body>
-      </html>];
-
-    my %directives = (
-      'title' => 'page_title',
-      'ul[class="people"]' => {
-        'person<-people' => {
-          'li:first-child' => 'person.name',
-          'ul[class="friends"]' => {
-            'friend<-people.friends' => {
-              'li:first-child' => 'friend',
-            },
-          },
-        },
-      },
-    );
+      </html>
+    ];
 
     my $pure = Template::Pure->new(
-      template=>$html_string,
-      directives=>\%directives);
-
-    my %data = (
-      page_title => 'Just Another Page',
-      people => [
-        { name => 'john Doe', age => 25, friends => [qw/Mark Mary Joe Jack Jason/] },
-        { name => 'Bill On', age => 45, friends =>[qw/Srivinas Milton Aubrey/] },
+      template=>$html,
+      directives=> [
+        'head title' => 'meta.title',
+        '#article' => [
+          'h1' => 'header',
+          'div' => 'content',
+        ],
+        'ul li' => {
+          'friend<-user.friends' => [
+            '.' => '={friend}, #={i.index}',
+          ],
+        },
+      ],    
     );
 
-    my $rendered_template = $pure->render(\%data);
+    my $data = +{
+      meta => {
+        title => 'Travel Poetry',
+        created_on => '1/1/2000',
+      },
+      header => 'Fire',
+      content => q[
+        Are you doomed to discover that you never recovered from the narcoleptic
+        country in which you once stood? Where the fire's always burning, but
+        there's never enough wood?
+      ],
+      user => {
+        name => 'jnap',
+        friends => [qw/jack jane joe/],
+      },
+    };
+
+    print $pure->render($data);
+
+Results in:
+
+    <html>
+      <head>
+        <title>Travel Poetry</title>
+      </head>
+      <body>
+        <section id="article">
+          <h1>Fire</h1>
+          <div>
+            Are you doomed to discover that you never recovered from the narcoleptic
+            country in which you once stood? Where the fire&#39;s always burning, but
+            there&#39;s never enough wood?
+          </div>
+        </section>
+        <ul id="friendlist">
+          <li>jack, #1</li>
+          <li>jane, #2</li>
+          <li>joe, #3</li>
+        </ul>
+      </body>
+    </html>
 
 =head1 DESCRIPTION
 
-HTML/XML Templating system, inspired by pure.js L<http://beebole.com/pure/>, with
+B<NOTE> WARNING: Early access module. Although we have a lot of test cases and this is the
+third redo of the code I've not well tested certain features (such as using an object as
+a data context) and other parts such as the way we handle undefined values (or empty
+iterators) are still 'first draft'.  Code currently is entirely unoptimized.  Additionally the
+documenation could use another detailed review, and we'd benefit from some 'cookbook' style docs.
+Nevertheless its all working well enough that I'd like to publish it so I can start using it 
+more widely and hopefully some of you will like what you see and be inspired to try and help
+close the gaps.
+
+L<Template::Pure> HTML/XML Templating system, inspired by pure.js L<http://beebole.com/pure/>, with
 some additions and modifications to make it more Perlish and to be more suitable
 as a server side templating framework for larger scale needs instead of single page
 web applications.
@@ -434,22 +480,99 @@ The core concept is you have your templates in pure HTML and create CSS style
 matches to run transforms on the HTML to populate data into the template.  This allows you
 to have very clean, truely logicless templates.  This approach can be useful when the HTML designers
 know little more than HTML and related technologies.  It  helps promote separation of concerns
-between your UI developers and your server side developers.  The main downside is that it
-can place more work on the server side developers, who have to write the directives unless
-your UI developers are able and willing to learn the minimal Perl required for that job.  Also
-since it the CSS matching directives are based on the document structure, it can lead to onerous
-tight binding between yout document structure and the layout/display logic.  For example due to
-some limitations in the DOM parser, you might have to add some extra markup just so you have a
-place to match, when you have complex and deeply nested data.  Lastly most UI
-designers already are familiar with some basic templating systems and might really prefer to
-use that so that they can maintain more autonomy and avoid the additional learning curve that
-L<Template::Pure> will requires (most people seem to find its a bit more effort to learn off
-the top compared to more simple systems like Mustache or even L<Template::Toolkit>.
+between your UI developers and your server side developers.  Over the long term the separate
+and possibilities for code reuse can lead to an easier to maintain system.
+
+The main downside is that it can place more work on the server side developers, who have to
+write the directives unless your UI developers are able and willing to learn the minimal Perl
+required for that job.  Also since the CSS matching directives can be based on the document
+structure, it can lead to onerous tight binding between yout document structure and the layout/display
+logic.  For example due to some limitations in the DOM parser, you might have to add some extra markup
+just so you have a place to match, when you have complex and deeply nested data.
+
+Additionally many UI  designers already are familiar with some basic templating systems and 
+might really prefer to use that so that they can maintain more autonomy and avoid the additional
+learning curve that L<Template::Pure> will requires (most people seem to find its a bit more
+effort to learn off the top compared to more simple systems like Mustache or even L<Template::Toolkit>.
 
 Although inspired by pure.js L<http://beebole.com/pure/> this module attempts to help mitigate some
-of the listed  possible downsides with additional features that are a superset of the original 
-pure.js specification.  These additional features are intended to make it more suitable as a general
+of the listed possible downsides with additional features that are a superset of the original 
+pure.js specification. For example you may include templates inside of templates as includes or even
+overlays that provide much of the same benefit that template inheritance offers in many other
+popular template frameworks.  These additional features are intended to make it more suitable as a general
 purpose server side templating system.
+
+=head1 CREATING TEMPLATE OBJECTS
+
+The first step is to create a L<Template::Pure> object:
+
+    my $pure = Template::Pure->new(
+      template=>$html,
+      directives=> \@directives);
+
+L<Template::Pure> has two required parameters:
+
+=over 4
+
+=item template
+
+This is a string that is an HTML template that can be parsed by L<DOM::Tiny>
+
+=item directives
+
+An arrayref of directives, which are commands used to transform the template when
+rendering against data.  For more on directives, see L</DIRECTIVES>
+
+=back
+
+L<Template::Pure> has a third optional parameter, 'filters', which is a hashref of
+user created filters.  For more see L<Template::Pure::Filters> and L</FILTERS>.
+
+Once you have a created object, you may call the following methods:
+
+=over 4
+
+=item render ($data, ?\@extra_directives?)
+
+Render a template with the given '$data', which may be a hashref or an object with
+fields that match data paths defined in the directions section (see L</DIRECTIVES>)
+
+Returns a string.  You may pass in an arrayref of extra directives, which are executed
+just like directives defined at instantiation time (although future versions of this
+distribution may offer optimizations to directives known at create time).  These optional
+added directives are executed after the directives defined at create time.
+
+Since we often traverse the $data structure as part of rendering a template, we usually call
+the current path the 'data context'.  We always track the base or root context and you can
+always return to it, as you will later see in the L</DIRECTIVES> section.
+
+=item process_dom ($data, ?\@extra_directives?)
+
+Works just like 'render', except we return a L<DOM::Tiny> object instead of a string directly.
+Useful if you wish to retrieve the L<DOM::Tiny> object for advanced, custom tranformations.
+
+=item data_at_path ($data, $path)
+
+Given a $data object, returns the value at the defined $path.  Useful in your coderef actions
+(see below) when you wish to grab data from the current data context but wish to avoid
+using $data implimentation specific lookup.
+
+=item escape_html ($string)
+
+Given a string, returns a version of it that has been properly HTML escaped.  Since we do
+such escaping automatically for most directives you won't need it a lot, but could be useful
+in a coderef action.  Can also be called as a filter (see L</FILTERS>).
+
+=item encoded_string ($string)
+
+As mentioned we automatically escape values to help protect you against HTML injection style
+attacked, but there might be cases when you don't wish this protection.  Can also be called
+as a filter (see L</FILTERS>).
+
+=back
+
+There are other methods in the code but please consider all that stuff part of my 'black box'
+and only reach into it if you are willing to suffer possible breakage on version changes.
 
 =head1 DIRECTIVES
 
@@ -469,7 +592,7 @@ against a match specification:
     ];
 
     my $pure = Template::Pure->new(
-      template = $html,
+      template => $html,
       directives => [
         '#name' => 'fullname',
       ]);
@@ -507,7 +630,7 @@ current data context, for example:
       });
 
     my $pure = Template::Pure->new(
-      template = $html,
+      template => $html,
       directives => [ '#last_name' => 'identity.last_name']
     );
 
@@ -552,9 +675,14 @@ B<NOTE> Since directives are processed in order, this means that you can
 reference the rendered value of a previous directive via this alias.
 
 B<NOTE> The match runs against the current selected node, as defined by the last
-successful match.  This means quite often you will need to use the '/' and '../'
-special match syntax to indicate a match from the root of the DOM or a match from
-the most immediate parent node (or root).
+successful match.  If you need to match a value from the root of the DOM tree you
+can use the special '/' syntax on your CSS match, as shown in the above example,
+or:
+
+    directives => [
+      'h1#title' => \'/title',
+    ]);
+
 
 =head2 Coderef - Programmatically replace the value indicated
 
@@ -565,7 +693,7 @@ the most immediate parent node (or root).
     ];
 
     my $pure = Template::Pure->new(
-      template = $html,
+      template => $html,
       directives => [
         '#name' => sub {
           my ($instance, $dom, $data) = @_;
@@ -600,11 +728,6 @@ arguments:
 Your just need to return the value desired which will substitute for the matched node's
 current value.
 
-B<NOTE>: If instead of returning simple value, you return a reference (like an ArraRef,
-a HashRef, or an object) we act on that value as if it was the original action.  For
-example if your anonymous subroutine returns an Arrayref, we assume its a list of
-directives, and described.
-
 B<NOTE>: It might be a good idea to try and maintain as much implementation independence
 from you $data model as possible.  That way if later you change your $data from a hashref
 to an instance of an object you won't break your code.  One way to help achieve this is
@@ -612,7 +735,7 @@ to use L<Template::Pure>'s data lookup helper methods (which support dot notatio
 as described below.  For example consider re-writing the above example like this:
 
     my $pure = Template::Pure->new(
-      template = $html,
+      template => $html,
       directives => [
         '#name' => sub {
           my ($instance, $dom, $data) = @_;
@@ -663,13 +786,13 @@ Results in:
     </dl>
 
 For this simple case you could have made it more simple and avoided the nested directives, but
-in a complext template with a lot of organization you might find this leads to more readable and
+in a complex template with a lot of organization you might find this leads to more readable and
 concise directives. It can also promote reusability.
 
 =head2 Hashref - Move the root of the Data Context
 
 Just like it may be valuable to move the root DOM context to an inner node, sometimes you'd
-like to move the root of the current Data context to a path point.  This can result in cleaner
+like to move the root of the current Data context to an inner path point.  This can result in cleaner
 templates with less repeated syntax, as well as promote reusability. In order to do this you
 use a Hashref whose key is the path under the data context you wish to move to and who's value
 is an Arrayref of new directives.  These new directives can be any type of directive as already
@@ -685,7 +808,7 @@ shown or later documented.
     ];
 
     my $pure = Template::Pure->new(
-      template = $html,
+      template => $html,
       directives => [
         '#contact' => {
           'contact' => [
@@ -721,7 +844,7 @@ hashref can be used to perform loops over a node, such as when you wish to creat
 a list:
 
     my $html = qq[
-      <ol id='names'>
+      <ol>
         <li class='name'>
           <span class='first-name'>John</span>
           <span class='last-name'>Doe</span>
@@ -730,9 +853,9 @@ a list:
     ];
 
     my $pure = Template::Pure->new(
-      template = $html,
+      template => $html,
       directives => [
-        '#names' => {
+        '#name' => {
           'name<-names' => [
             '.first-name' => 'name.first',
             '.last-name' => 'name.last',
@@ -769,8 +892,7 @@ Results in:
     </ol>
 
 The indicated data path must be either an ArrayRef, a Hashref, or an object that provides
-an iterator interface (see below).   If an object does not provide this interface you
-may provide a 'coerce_iterator' key as described below.
+an iterator interface (see below).
 
 For each item in the array we render the selected node against that data and
 add it to parent node.  So the originally selected node is completely replaced by a
@@ -780,30 +902,23 @@ node value for as many times as there is items of data.
 In the case the referenced data is explicitly set to undefined, the full node is
 removed (the matched node, not just the value).
 
-B<NOTE>: This behavior is somewhat different from pure.js, our inspiration.  Changes
-have been made to be more consistent with our extended behavior.
-
-B<NOTE>: should we say that if a path exists but returns undef, we should have a special zero
-length iterator (or something else, like [])...
-
 =head3 Special value injected into a loop
 
-When you create a loop we automatically add a special data key called 'i' (or 'ii', 'iii', etc
-should an 'i' already exist) which is an object that contains meta data on the current state of the
-loop. Fields that can be referenced are:
+When you create a loop we automatically add a special data key called 'i' which is an object
+that contains meta data on the current state of the loop. Fields that can be referenced are:
 
 =over 4
 
-=item value
+=item current_value
 
 An alias to the current value of the iterator.
 
-=item current_index
+=item index
 
-The current index of the iterator (starting from 0.. or from the first key in a hashref or fields
+The current index of the iterator (starting from 1.. or from the first key in a hashref or fields
 interator).
 
-=item last_index
+=item max_index
 
 The last index item, either number or field based.
 
@@ -837,18 +952,21 @@ You may loop over a hashref as in the following example:
 
     my $html = qq[
       <dl id='dlist'>
-        <dt>property</dt>
-        <dd>value</dd>
+        <section>
+          <dt>property</dt>
+          <dd>value</dd>
+        </section>
       </dl>];
 
     my $pure = Template::Pure->new(
-      template = $html,
+      template => $html,
       directives => [
-        'dl#dlist' => {
+        'dl#dlist section' => {
           'property<-author' => [
-            'dt' => 'i.current_index',
+            'dt' => 'i.index',
             'dd' => 'property',
           ],
+        },
       ]
     );
 
@@ -864,14 +982,24 @@ You may loop over a hashref as in the following example:
 
 Results in:
 
-    <dl id='dlist'>
-      <dt>first_name</dt>
-      <dd>John</dd>
-      <dt>last_name</dt>
-      <dd>Napiorkowski</dd>
-      <dt>email</dt>
-      <dd>jjn1056@yahoo.com</dd>
+    <dl id="dlist">
+      <section>
+        <dt>first_name</dt>
+        <dd>John</dd>
+      </section>
+      <section>
+        <dt>last_name</dt>
+        <dd>Napiorkowski</dd>
+      </section>
+      <section>
+        <dt>email</dt>
+        <dd>jjn1056@yahoo.com</dd>
+      </section>
     </dl>
+
+B<NOTE> This is a good example of a current limitation in the CSS Match Specification that
+requires adding a 'section' tag as a fudge to give the look something to target.  Future
+versions of this distribution may offer additional match syntax to get around this problem.
 
 B<NOTE> Notice the usage of the special data path 'i.index' which for a hashref or fields
 type loop contains the field or hashref key name.
@@ -912,11 +1040,9 @@ The number of items in the iterator (counting from 1 for one item)
 
 Reset the iterator to the starting item.
 
-=item sort
+=item all 
 
-Accepts an anonymous subroutine whos interface is object specific
-but who's required return valid is a new object that does the iterator
-interface and whoc provides display specific sorting rules.
+Returns all the items in the iterator
 
 =back
 
@@ -938,14 +1064,14 @@ and hashrefs this is simple:
     my $pure = Template::Pure->new(
       template = $html,
       directives => [
-        '#names' => {
+        '#name' => {
           'name<-names' => [
             '.first-name' => 'name.first',
             '.last-name' => 'name.last',
           ],
-          'sort' => sub {
-            my ($template, $a, $b) = @_;
-            return $a->last cmp $b->last;
+          'order_by' => sub {
+            my ($hashref, $a, $b) = @_;
+            return $a->{last} cmp $b->{last};
           },
         },
       ]
@@ -978,12 +1104,12 @@ Results in:
       </li>
     </ol>
 
-So you have a key 'sort' at the same level as the loop action declaration
+So you have a key 'order_by' at the same level as the loop action declaration
 which is an anonynous subroutine that takes three arguments, the first being
-a reference to the template object, followed by the $a and $b items to be
-compared for example as in:
+a reference to the data you are sorting (an arrayref or hashref)
+followed by the $a and $b items to be compared for example as in:
 
-    my @display = sort { $a->last cmp $b->last } @list;
+    my @display = sort { $a->{last} cmp $b->{last} } @list;
 
 If your iterator is over an object the interface is slightly more complex since
 we allow for the object to provide a sort method based on its internal needs.
@@ -991,26 +1117,26 @@ For example if you have a L<DBIx::Class::Resultset> as your iterator, you may
 wish to order your display at the database level:
 
     'sort' => sub {
-      my ($template, $iterator) = @_;
-      return $iterator->order_by_last_name;
+      my ($object) = @_;
+      return $object->order_by_last_name;
     },
 
 We recommend avoiding implimentation specific details when possible (for example
 in L<DBIx::Class> use a custom resultset method, not a ->search query.).
 
-=head3 Perform a 'grep' on your loop items
+=head3 Perform a 'filter' on your loop items
 
 You may wish for the purposes of display to skip items in your loop.  Similar to
-'sort', you may create a 'grep' key that returns either true or false to determine
+'order_by', you may create a 'grep' key that returns either true or false to determine
 if an item in the loop is allowed (works like the 'grep' function).
 
     # Only show items where the value is greater than 10.
-    'grep' => sub {
+    'filter' => sub {
       my ($template, $item) = @_;
       return $item > 10; 
     },
 
-Just like with 'sort', if your iterator is over an object, you recieve that
+Just like with 'order_by', if your iterator is over an object, you recieve that
 object as the argument and are expected to return a new iterator that is properly
 filtered:
 
@@ -1035,23 +1161,6 @@ an alternative method:
             '.value' => 'field.value',
           ],
           'display_fields' => 'columns',
-        },
-      ]
-
-Alternatively you can set the value of 'display_fields' to a code reference,
-which when invoked will get the template object and the object to be iterated
-over:
-
-    directives => [
-      '#meta' => {
-        'field<-info' => [
-            '.name' => 'field.key',
-            '.value' => 'field.value',
-          ],
-          'display_fields' => sub {
-            my ($template, $object) = @_;
-            return $object->columns;
-          },
         },
       ]
 
@@ -1108,9 +1217,6 @@ add one additional field called 'content' which is the value of the matched
 node.  You can use this so that you can 'wrap' nodes with a template (similar
 to the L<Template> WRAPPER directive).
 
-TODO: Should 'content' be the node value, or the full node... or do we need
-more than one injected data path (value, node, ...)
-
     my $wrapper_html = qq[
       <p class="headline">To Be Wrapped</p>
     ];
@@ -1142,59 +1248,93 @@ Results in:
 Lastly you can mimic a type of inheritance using data mapping and
 node aliasing:
 
-    my $parent_html = qq[
+   my $master_html = q[
       <html>
         <head>
-          <title>Title</title>
+          <title>Example Title</title>
+          <link rel="stylesheet" href="/css/pure-min.css"/>
+            <link rel="stylesheet" href="/css/grids-responsive-min.css"/>
+              <link rel="stylesheet" href="/css/common.css"/>
+          <script src="/js/3rd-party/angular.min.js"></script>
+            <script src="/js/3rd-party/angular.resource.min.js"></script>
         </head>
         <body>
-          Example
+          <section id="content">...</section>
+          <p id="foot">Here's the footer</p>
         </body>
       </html>
     ];
 
-    my $parent = Template::Pure->new(
-      template = $parent_html,
-      directives => [
+    my $master = Template::Pure->new(
+      template=>$master_html,
+      directives=> [
         'title' => 'title',
-        'body' => 'body',
+        '^title+' => 'scripts',
+        'body section#content' => 'content',
       ]);
 
-    my $page_html = qq[
+    my $page_html = q[
       <html>
-        <title>Welcome Page</title>
+        <head>
+          <title>The Real Page</title>
+          <script>
+          function foo(bar) {
+            return baz;
+          }
+          </script>
+        </head>
         <body>
-          <div id="content">Page Content</div>
+          You are doomed to discover that you never
+          recovered from the narcolyptic country in
+          which you once stood; where the fire's always
+          burning but there's never enough wood.
         </body>
       </html>
     ];
 
     my $page = Template::Pure->new(
-      template = $page_html,
-      directives => [
-        '^html' => {
+      template=>$page_html,
+      directives=> [
+        'title' => 'meta.title',
+        'html' => [
           {
-            'title' => \'title',
-            'body' => \'body',
-          }, $parent,
-        },
-        '#content' => 'content',
+            title => \'title',
+            scripts => \'^head script',
+            content => \'body',
+          },
+          '^.' => $master,
+        ]
       ]);
 
-    my %data = (
-      content => $article_text,
-    );
-
-    print $pure->render(\%data);
+    my $data = +{
+      meta => {
+        title => 'Inner Stuff',
+      },
+    };
 
 Results in:
 
     <html>
       <head>
-        <title>Welcome Page</title>
+        <title>Inner Stuff</title><script>
+        function foo(bar) {
+          return baz;
+        }
+        </script>
+        <link href="/css/pure-min.css" rel="stylesheet">
+          <link href="/css/grids-responsive-min.css" rel="stylesheet">
+            <link href="/css/common.css" rel="stylesheet">
+        <script src="/js/3rd-party/angular.min.js"></script>
+          <script src="/js/3rd-party/angular.resource.min.js"></script>
       </head>
       <body>
-        <div id="content">$article_text</div>
+        <section id="content">
+        You are doomed to discover that you never
+        recovered from the narcolyptic country in
+        which you once stood; where the fire&amp;#39;s always
+        burning but there&amp;#39;s never enough wood.
+      </section>
+        <p id="foot">Here&#39;s the footer</p>
       </body>
     </html>
 
@@ -1232,40 +1372,29 @@ is to remove the matching node (the full matching node, not just the value).
 Trying to resolve a key or method that does not exist returns an error.
 However its not uncommon for some types of paths to have optional parts
 and in these cases its not strictly and error when the path does not exist.
-In this case you may prefix 'maybe:' to your path part, which will surpress
+In this case you may prefix 'optional:' to your path part, which will surpress
 an error in the case the requested path does not exist:
+
+    directives => [
+      'title' => 'meta.title',
+      'copyright => 'meta.license_info.optional:copyright_date',
+      ...,
+    ],
 
 In this case instead of returning an error we treat the path as though it
 returned 'undefined' (which means we trim out the matching node).
 
-TODO: do we need both 'optional' for return undef on paths that don't exist
-and 'maybe' to handle th case when the path exists but returns undef?
+In other cases your path might exist, but returns undefined.  This can be an
+issue if you have following paths (common case when traversing L<DBIx::Class>
+relationships...) and you don't want to throw an exception.  In this case you
+may use a 'maybe:' prefix, which returns undefined and treats the entire remaining
+path as undefined:
 
     directives => [
       'title' => 'meta.title',
-      'copyright => 'meta.license_info.maybe:author_name',
+      'copyright => 'meta.maybe:license_info.copyright_date',
       ...,
     ],
-
-    my %data = (
-      meta => {
-        title => 'Hello World!',
-        license_info => {
-          type => 'Artistic',
-          copyright_date => 2016,
-        },
-      },
-    );
-
-Using the 'maybe:' modifier can be useful when you have a complex data
-context with possible optional paths and empty results (for example if
-you are following a L<DBIx::Class> relationship graph you might have
-optional relationships.)
-
-In addition to searching a path using dot notation, you can change the
-current path with '/' and '../'.  Using '../' moves you up one level
-(returns you to the preview path) while using '/' moves you back to the root
-context.  Both these are only in effect for the action that is using them.
 
 =head2 Remapping Your Data Context
 
@@ -1342,7 +1471,86 @@ paths can be simple or complex, and even contain filters:
       ]
     );
 
-=head2 Filtering your data
+For more on filters see L</FILTERS>
+
+=head2 Special indicators in your match.
+
+In General your match specification is a CSS match supported by the
+underlying HTML parser.  However the following specials are supported
+for needs unique to the needs of templating:
+
+=over 4
+
+=item '.': Select the current node
+
+Used to indicate the current root node.  Useful when you have created a match
+with sub directives.
+
+    my $pure = Template::Pure->new(
+      template => $html,
+      directives => [
+        'body' => [
+        ]
+      ]
+    );
+
+=item '/': The root node
+
+Used when you which to select from the root of the template DOM, not the current
+selected node.
+
+=item '@': Select an attribute within the current node
+
+Used to update values inside a node:
+
+    my $pure = Template::Pure->new(
+      template => $html,
+      directives => [
+        'h1@class' => 'header_class',
+      ],
+    );
+
+=item '+': Append or prepend a value
+
+    my $pure = Template::Pure->new(
+      template => $html,
+      directives => [
+        '+h1' => 'title',
+        '#footer+' => 'copyright_date',
+      ],
+    );
+
+The default behavior is for a match to replace the matched node's content.  In some
+cases you may wish to preserve the template content and instead either add more
+content to the front or back of it.
+
+B<NOTE> Can be combined with '@' to append / prepend to an attribute.
+
+B<NOTE> Special handling when appending or prepending to a class attribute (we add a
+space if there is an existing since that is expected).
+
+=item '^': Replace current node completely
+
+Normally we replace, append or prepend to the value of the selected node.  Using the
+'^' at the front of your match indicates operation should happen on the entire node,
+not just the value.  Can be combined with '+' for append/prepend.
+
+=item '|': Run a filter on the current node
+
+Passed the currently selected node to a code reference.  You can run L<DOM::Tiny>
+transforms on the entire selected node.  Nothing should be returned from this 
+coderef.
+
+    'body|' => sub {
+      my ($template, $dom, $data) = @_;
+      $dom->find('p')->each( sub {
+        $_->attr('data-pure', 1);
+      });
+    }
+
+=back 
+
+=head1 FILTERS
 
 You may filter you data via a provided built in display filter:
 
@@ -1394,69 +1602,6 @@ which should make it easier for you to give the job of writing directives / acti
 to non programmers.
 
 See L<Template::Pure::Filters> for all bundled filters.
-
-=head2 Special indicators in your match.
-
-In General your match specification is a CSS match supported by the
-underlying HTML parser.  However the following specials are supported
-for needs unique to the needs of templating:
-
-=over 4
-
-=item '.': Select the current node
-
-Used to indicate the current root node.  Useful when you have created a match
-with sub directives.
-
-    my $pure = Template::Pure->new(
-      template => $html,
-      directives => [
-        'body' => [
-        ]
-      ]
-    );
-
-=item '..': Up to the current nodes parent (or the root node) ???
-
-=item '/': The root node
-
-=item '@': Select an attributes within the current node
-
-=item '+': Append or prepend a value
-
-B<NOTE> Can be combined with '@' to append / prepend to an attribute.
-
-B<NOTE> Special handling when appending or prepending to a class attribute (we add a
-space if there is an existing since that is expected).
-
-=item '^': Replace current node completely
-
-Normally we replace, append or prepend to the value of the selected node.  Using the
-'^' at the front of your match indicates operation should happen on the entire node,
-not just the value.  Can be combined with '+' for append/prepend.
-
-=item '|': Run a filter on the current node
-
-Passed the currently selected node to a code reference.  You can run L<DOM::Tiny>
-transforms on the entire selected node.  Nothing should be returned from this 
-coderef.
-
-    'body|' => sub {
-      my ($template, $dom, $data) = @_;
-      $dom->find('p')->each( sub {
-        $_->attr('data-pure', 1);
-      });
-    }
-
-=back 
-
-=head1 Overlay ???
-
-=head1 PROCESSING INSTRUCTIONS
-
-You may use processing instructions in your template to indicate setup values
-
-<?pure-directives ?>
 
 =head1 IMPORTANT NOTE REGARDING VALID HTML
 
