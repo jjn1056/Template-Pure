@@ -3,7 +3,7 @@ use warnings;
 
 package Template::Pure;
 
-our $VERSION = '0.002';
+our $VERSION = '0.003';
 
 use DOM::Tiny;
 use Scalar::Util;
@@ -82,6 +82,8 @@ sub _process_dom_recursive {
       $self->_process_sub_data($dom, $data, \%match_spec, %{$action_proto});
     } elsif((ref($action_proto)||'') eq 'ARRAY') {
       $self->process_sub_directives($dom, $data->value, $match_spec{css}, @{$action_proto});
+    } elsif((ref($action_proto)||'') eq 'CODE') {
+      $self->_process_code($dom, $data, $action_proto, %match_spec);
     } else {
       my $value = $self->_value_from_action_proto($dom, $data, $action_proto, %match_spec);
       $self->_process_match_spec($dom, $value, %match_spec);
@@ -98,7 +100,8 @@ sub _value_from_action_proto {
   } elsif((ref($action_proto)||'') eq 'SCALAR') {
     return $self->_value_from_dom($dom, $$action_proto);
   } elsif((ref($action_proto)||'') eq 'CODE') {
-    return $action_proto->($self, $dom, $data);
+    ## TODO, probably wrong when the CSS matches more than one node
+    return $action_proto->($self, $self->at_or_die($dom, $match_spec{css}), $data->value);
   } elsif(Scalar::Util::blessed($action_proto) && $action_proto->isa(ref $self)) {
     return $self->_process_template_obj($dom, $data, $action_proto, %match_spec);
   } else {
@@ -131,6 +134,21 @@ sub _value_from_scalar_action {
   } else {
     my %data_spec = $self->parse_data_spec($action_proto);
     return $self->_value_from_data($data, %data_spec);
+  }
+}
+
+sub _process_code {
+  my ($self, $dom, $data, $code, %match_spec) = @_;
+  my $css = $match_spec{css};
+  if($css eq '.') {
+    my $value = $code->($self, $dom, $data->value);
+    $self->_process_mode($dom, $value, %match_spec);
+  } else {
+    my $collection = $dom->find($css);
+    $collection->each(sub {
+      my $value = $code->($self, $_, $data->value);
+      $self->_process_mode($_, $value, %match_spec);
+    });
   }
 }
 
@@ -293,7 +311,7 @@ sub _process_dom_filter {
   } else {
     my $collection = $dom->find($css);
     $collection->each(sub {
-      $cb->($self, $dom, $data);
+      $cb->($self, $_, $data);
     });
   }
 }

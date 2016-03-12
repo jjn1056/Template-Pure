@@ -1,5 +1,9 @@
 The following logs changes for the CPAN distribution Template::Pure
 
+0.003   12 March 2016
+        - Fixes for code actions and filters when the match css matches
+          more than on node.
+
 0.002   11 March 2016
         - Fix to properly mark scalar ref actions as encoded
 
