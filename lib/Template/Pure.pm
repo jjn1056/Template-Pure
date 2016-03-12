@@ -3,7 +3,7 @@ use warnings;
 
 package Template::Pure;
 
-our $VERSION = '0.001';
+our $VERSION = '0.002';
 
 use DOM::Tiny;
 use Scalar::Util;
@@ -55,7 +55,7 @@ sub data_at_path {
 
 sub at_or_die {
   my ($self, $dom, $css) = @_;
-  my $new = $dom->at($css);
+  my $new = $css eq '.' ? $dom : $dom->at($css);
   die "$css is not a matching path" unless defined $new;
   return $new;
 }
@@ -257,7 +257,7 @@ sub _value_from_dom {
   ## a collection, which populates an iterator if requested?
 
   if($match_spec{target} eq 'content') {
-    return $self->at_or_die($dom, $match_spec{css})->content;
+    return $self->encoded_string($self->at_or_die($dom, $match_spec{css})->content);
   } elsif($match_spec{target} eq 'node') {
     ## When we want a full node, with HTML tags, we encode the string
     ## since I presume they want a copy not escaped.  T 'think' this is
@@ -265,6 +265,7 @@ sub _value_from_dom {
     ## yourself when you don't want it.
     return $self->encoded_string($self->at_or_die($dom, $match_spec{css})->to_string);
   } elsif(my $attr = ${$match_spec{target}}) {
+    ## TODO not sure what if any encoding we need here.
     return $self->at_or_die($dom, $match_spec{css})->attr($attr);
   }
 }

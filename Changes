@@ -1,5 +1,8 @@
 The following logs changes for the CPAN distribution Template::Pure
 
+0.002   11 March 2016
+        - Fix to properly mark scalar ref actions as encoded
+
 0.001   11 March 2016
         - First usable version, with caveats (its still earlly access)
 

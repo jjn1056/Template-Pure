@@ -38,10 +38,10 @@ ok my $page_html = q[
       </script>
     </head>
     <body>
-      You are doomed to discover that you never
+      <p>You are doomed to discover that you never
       recovered from the narcolyptic country in
       which you once stood; where the fire's always
-      burning but there's never enough wood.
+      burning but there's never enough wood.</p>
     </body>
   </html>
 ];
@@ -72,7 +72,7 @@ ok my $dom = DOM::Tiny->new($string);
 is $dom->at('title')->content, 'Inner Stuff';
 is $dom->at('#foot')->content, 'Here&#39;s the footer';
 is $dom->find('link')->[0]->attr('href'), '/css/pure-min.css';
-like $dom->at('body #content'), qr'You are doomed to discover';
+like $dom->at('body #content'), qr'<p>You are doomed to discover';
 like $dom->find('script')->[0]->content, qr'function foo';
 
 done_testing; 
