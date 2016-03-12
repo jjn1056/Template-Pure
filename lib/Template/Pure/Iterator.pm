@@ -3,6 +3,9 @@ use strict;
 
 package Template::Pure::Iterator;
 
+## Please not everything here is internal code... it will likely change a 
+## lot so please rely only on the public interface.
+
 use Scalar::Util 'blessed';
 
 sub from_proto {
