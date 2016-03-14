@@ -12,7 +12,7 @@ sub parse_itr_spec {
 
 sub parse_data_template {
   my ($spec) = @_;
-  $spec=~s/[\n\r]//gs; # cleanup newlines.
+  $spec=~s/\r|\n//gs; # cleanup newlines.
 
   my $opentag = qr/=\{/;
   my $closetag = qr/\}/;
@@ -43,7 +43,7 @@ sub parse_data_template {
 
 sub parse_data_spec {
   my $spec = shift;
-  $spec=~s/[\n\r]//gs; # cleanup newlines.
+  $spec=~s/\r|\n//gs; # cleanup newlines.
   my $absolute = ($spec=~s[^\/][]);
 
   my @parts;

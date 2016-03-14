@@ -1,5 +1,9 @@
 The following logs changes for the CPAN distribution Template::Pure
 
+0.004   14 March 2016
+        - Rename Utils to ParseUtils
+        - Fixed some reported errors
+
 0.003   12 March 2016
         - Fixes for code actions and filters when the match css matches
           more than on node.

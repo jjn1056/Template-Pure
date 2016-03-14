@@ -3,7 +3,7 @@ use warnings;
 
 package Template::Pure;
 
-our $VERSION = '0.003';
+our $VERSION = '0.004';
 
 use DOM::Tiny;
 use Scalar::Util;
@@ -78,7 +78,6 @@ sub _process_dom_recursive {
     if($match_spec{mode} eq 'filter') {
       $self->_process_dom_filter($dom, $data, $match_spec{css}, $action_proto);
     } elsif((ref($action_proto)||'') eq 'HASH') {
-      # Could be data remap or iterator
       $self->_process_sub_data($dom, $data, \%match_spec, %{$action_proto});
     } elsif((ref($action_proto)||'') eq 'ARRAY') {
       $self->process_sub_directives($dom, $data->value, $match_spec{css}, @{$action_proto});
