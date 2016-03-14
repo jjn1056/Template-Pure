@@ -1,5 +1,10 @@
 The following logs changes for the CPAN distribution Template::Pure
 
+0.005   14 Marxh 2016
+        - pod tests and pod fixes
+        - new feature: let you assign a the target of a data context directly
+          to a sub template.
+
 0.004   14 March 2016
         - Rename Utils to ParseUtils
         - Fixed some reported errors

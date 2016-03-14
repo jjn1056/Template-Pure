@@ -3,7 +3,7 @@ use warnings;
 
 package Template::Pure;
 
-our $VERSION = '0.004';
+our $VERSION = '0.005';
 
 use DOM::Tiny;
 use Scalar::Util;
@@ -864,6 +864,44 @@ Results in:
       <dt>Email</dt>
       <dd class='email'>jjnapiork@cpan.org'</dd>
     </dl>
+
+In addition to an arrayref of new directives, you may assign the new DOM and Data context
+directly to a template object (see L</Object - Set the match value to another Pure Template>
+For example:
+
+    my $contact_include = Template::Pure->new(
+      template => q[
+        <dl>
+          <dt>Name</dt>
+          <dd class='name'>First Last</dd>
+          <dt>Email</dt>
+          <dd class='email'>Email@email.com</dd>
+        </dl>
+      ],
+      directives => [
+        '.name' => 'fullname',
+        '.email => 'email',
+
+
+    my $pure = Template::Pure->new(
+      template => $html,
+      directives => [
+        '#contact' => {
+          'contact' => $contact_include;
+        },
+      ]
+    );
+
+    print $pure->render({
+      person => {
+        contact => {
+          fullname => 'John Doe',
+          email => 'jd@email.com'.
+        }
+      },
+    });
+
+This lets you isolate the data structure of your includes to improve reuse and clarity.
 
 =head2 Hashref - Create a Loop
 

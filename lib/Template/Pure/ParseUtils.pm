@@ -494,6 +494,8 @@ We expect the action the be an anonymous subroutine.
 
 =back
 
+=back
+
 =head1 SEE ALSO
  
 L<Template::Pure>.
