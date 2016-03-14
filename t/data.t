@@ -1,9 +1,9 @@
 use Test::Most;
-use Template::Pure::Utils;
+use Template::Pure::ParseUtils;
 use Template::Pure::DataContext;
 
 # Helper function to make the tests less verbose
-sub parse_data { Template::Pure::Utils::parse_data_spec(shift) }
+sub parse_data { Template::Pure::ParseUtils::parse_data_spec(shift) }
 sub data_context { Template::Pure::DataContext->new(shift) }
 
 {

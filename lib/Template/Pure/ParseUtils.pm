@@ -1,30 +1,8 @@
-package Template::Pure::Utils;
+package Template::Pure::ParseUtils;
  
 use strict;
 use warnings;
 use Scalar::Util ();
-
-sub escape_html {
-  my ($value) = @_;
-  my %_escape_table = (
-    '&' => '&amp;', 
-    '>' => '&gt;', 
-    '<' => '&lt;',
-    q{"} => '&quot;',
-    q{'} => '&#39;' );
-
-  if(
-    Scalar::Util::blessed($value) && 
-    $value->isa('Template::Pure::EncodedString')
-  ) {
-    return $value;
-  } else {
-    $value =~ s/([&><"'])/$_escape_table{$1}/ge unless 
-      !defined($value) ||
-        (Scalar::Util::blessed($value) && $value->isa('Template::Pure::UndefObject'));
-    return $value;
-  }
-}
 
 sub parse_itr_spec {
   my ($spec) = @_;
@@ -182,7 +160,7 @@ sub parse_match_spec {
 
 =head1 NAME
 
-Template::Pure::Utils - Utility Functions
+Template::Pure::ParseUtils - Utility Functions
 
 =head1 SYNOPSIS
 

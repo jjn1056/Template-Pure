@@ -1,11 +1,11 @@
 use Test::Most;
-use Template::Pure::Utils;
+use Template::Pure::ParseUtils;
 
 # Helper function to make the tests less verbose
-sub data { +{ Template::Pure::Utils::parse_data_spec(shift) } }
-sub match { +{ Template::Pure::Utils::parse_match_spec(shift) } }
-sub template { [ Template::Pure::Utils::parse_data_template(shift) ] }
-sub itr { +{ Template::Pure::Utils::parse_itr_spec(shift) } }
+sub data { +{ Template::Pure::ParseUtils::parse_data_spec(shift) } }
+sub match { +{ Template::Pure::ParseUtils::parse_match_spec(shift) } }
+sub template { [ Template::Pure::ParseUtils::parse_data_template(shift) ] }
+sub itr { +{ Template::Pure::ParseUtils::parse_itr_spec(shift) } }
 
 # Test cases for match spec parsing
 is_deeply match('title'), +{mode=>'replace', css=>'title', target=>'content', absolute=>''};

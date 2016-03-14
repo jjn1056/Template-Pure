@@ -7,7 +7,7 @@ our $VERSION = '0.003';
 
 use DOM::Tiny;
 use Scalar::Util;
-use Template::Pure::Utils;
+use Template::Pure::ParseUtils;
 use Template::Pure::Filters;
 use Template::Pure::DataContext;
 use Template::Pure::DataProxy;
@@ -40,11 +40,11 @@ sub process_dom {
 }
 
 sub default_filters { Template::Pure::Filters->all }
-sub parse_match_spec { Template::Pure::Utils::parse_match_spec($_[1]) }
-sub parse_data_spec { Template::Pure::Utils::parse_data_spec($_[1]) }
-sub parse_data_template { Template::Pure::Utils::parse_data_template($_[1]) }
-sub parse_itr_spec { Template::Pure::Utils::parse_itr_spec($_[1]) } 
-sub escape_html { Template::Pure::Utils::escape_html($_[1]) }
+sub parse_match_spec { Template::Pure::ParseUtils::parse_match_spec($_[1]) }
+sub parse_data_spec { Template::Pure::ParseUtils::parse_data_spec($_[1]) }
+sub parse_data_template { Template::Pure::ParseUtils::parse_data_template($_[1]) }
+sub parse_itr_spec { Template::Pure::ParseUtils::parse_itr_spec($_[1]) } 
+sub escape_html { Template::Pure::Filters::escape_html($_[1]) }
 sub encoded_string { Template::Pure::EncodedString->new($_[1]) }
 
 sub data_at_path {
@@ -1636,7 +1636,8 @@ John Napiorkowski L<email:jjnapiork@cpan.org>
   
 =head1 SEE ALSO
  
-L<DOM::Tiny>, L<Catalyst::View::Template::Pure>.
+L<DOM::Tiny>, L<HTML::Zoom>.  Both of these are approaches to programmatically examining and
+altering a DOM.
 
 L<Template::Semantic> is a similar system that uses XPATH instead of a CSS inspired matching
 specification.  It has more dependencies (including L<XML::LibXML> and doesn't separate the actual
