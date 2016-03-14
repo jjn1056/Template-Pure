@@ -191,11 +191,12 @@ sub _process_sub_data {
 
   my ($sub_data_proto, $sub_data_action) = %action;
 
-  ## TODO: Allow fro $sub_data_proto to be a template object
-  die "Action for '$sub_data_proto' must be an arrayref of new directives"
-    unless ref $sub_data_action eq 'ARRAY';
-
   if(index($sub_data_proto,'<-') > 0) {
+
+    die "Action for '$sub_data_proto' must be an arrayref of new directives"
+      unless ref $sub_data_action eq 'ARRAY';
+
+
     my ($new_key, $itr_data_spec) = $self->parse_itr_spec($sub_data_proto);
     my $itr_data_proto = $self->_value_from_data($data, %$itr_data_spec);
 
@@ -227,8 +228,15 @@ sub _process_sub_data {
     my $value = $self->_value_from_data($data, %sub_data_spec);
 
     ## If the value is undefined, we dont' continue... should we remove all this...?
-
-    $self->process_sub_directives($dom, $value, $css, @{$sub_data_action});
+    if(ref $sub_data_action eq 'ARRAY') {
+      $self->process_sub_directives($dom, $value, $css, @{$sub_data_action});
+    } elsif(Scalar::Util::blessed($sub_data_action) && $sub_data_action->isa(ref $self)) {
+      my $new_data = Template::Pure::DataContext->new($value);
+      my $new_value = $self->_process_template_obj($dom, $new_data, $sub_data_action, %$match_spec);
+      $self->_process_match_spec($dom, $new_value, %$match_spec);      
+    } else {
+      die "Don't know how to process $value on $css for $sub_data_action";
+    }
   }
 
   ## Todo... not sure if this is right or useful

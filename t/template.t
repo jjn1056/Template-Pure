@@ -14,6 +14,17 @@ ok my $inner = Template::Pure->new(
     '#content' => 'content',
 ]);
 
+ok my $inner_html_2 = q[
+  <span>Inner</span>
+];
+
+ok my $inner_2 = Template::Pure->new(
+  template=>$inner_html_2,
+  directives=> [
+    'span' => 'bar.baz',
+]);
+
+
 
 ok my $html = q[
   <html>
@@ -22,6 +33,7 @@ ok my $html = q[
     </head>
     <body>
       <p id="story">Some Stuff</p>
+      <div>BAZ</div>
     </body>
   </html>
 ];
@@ -31,6 +43,9 @@ ok my $pure = Template::Pure->new(
   directives=> [
     '^body p'=>$inner,
     '#story' => 'story',
+    'div' => {
+      foo => $inner_2,
+    },
 ]);
 
 ok my $data = +{
@@ -39,6 +54,11 @@ ok my $data = +{
     date => '1/1/2020',
   },
   story => 'XX' x 10,
+  foo => {
+    bar => {
+      baz => 1000,
+    }
+  }
 };
 
 ok my $string = $pure->render($data);
@@ -46,5 +66,6 @@ ok my $dom = DOM::Tiny->new($string);
 
 is $dom->at('body section#content p#story ')->content, 'XXXXXXXXXXXXXXXXXXXX';
 is $dom->at('body h1')->content, 'Inner Stuff';
+is $dom->at('body div span')->content, '1000';
 
 done_testing; 
