@@ -9,10 +9,12 @@ perl:
   - "5.10"
   - "5.8"
 
-before_install:
-  - eval $(curl https://travis-perl.github.io/init) --auto
-
 install:
+  - cpanm --quiet --notest --skip-satisfied Dist::Zilla
   - cpanm --notest --metacpan --skip-satisfied Test::Pod
-  - cpan-install --deps
-  - cpan-install --coverage
+  - dzil authordeps | grep -vP '[^\w:]' | xargs -n 5 -P 10 cpanm --quiet --notest --skip-satisfied
+  - dzil listdeps --author | cpanm --quiet --notest --skip-satisfied
+  - dzil listdeps | grep -vP '[^\w:]' | cpanm --quiet --notest --skip-satisfied
+
+script:
+   - dzil smoke --release --author
