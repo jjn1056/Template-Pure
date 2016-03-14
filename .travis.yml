@@ -13,4 +13,6 @@ before_install:
   - eval $(curl https://travis-perl.github.io/init) --auto
 
 install:
-  - cpanm --notest --metacpan --skip-satisfied Test::Pod 
+  - cpanm --notest --metacpan --skip-satisfied Test::Pod
+  - cpan-install --deps
+  - cpan-install --coverage
