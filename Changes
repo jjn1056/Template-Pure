@@ -1,6 +1,6 @@
 The following logs changes for the CPAN distribution Template::Pure
 
-0.005   14 Marxh 2016
+0.005   14 March 2016
         - pod tests and pod fixes (manwar++)
         - new feature: let you assign a the target of a data context directly
           to a sub template.
