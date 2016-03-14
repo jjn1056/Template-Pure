@@ -33,7 +33,6 @@ sub at {
       } elsif($at->{optional}) {
         $current = undef;
       } else {
-        use Devel::Dwarn; Dwarn $current;
         die "Missing path '$key'";
       }
     } elsif(ref $current eq 'HASH') {

@@ -172,8 +172,6 @@ is_deeply data('aaa.bbb.ccc|f0 | f1("aa") | f2("ff", ={ddd.eee | xx(1,={zz.11 | 
   ]
 };
 
-use Devel::Dwarn;
-
 is_deeply template('Hello ={foo} world!'), [
   'Hello ',
   {
