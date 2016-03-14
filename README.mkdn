@@ -448,6 +448,44 @@ Results in:
       <dd class='email'>jjnapiork@cpan.org'</dd>
     </dl>
 
+In addition to an arrayref of new directives, you may assign the new DOM and Data context
+directly to a template object (see ["Object - Set the match value to another Pure Template"](#object-set-the-match-value-to-another-pure-template)
+For example:
+
+    my $contact_include = Template::Pure->new(
+      template => q[
+        <dl>
+          <dt>Name</dt>
+          <dd class='name'>First Last</dd>
+          <dt>Email</dt>
+          <dd class='email'>Email@email.com</dd>
+        </dl>
+      ],
+      directives => [
+        '.name' => 'fullname',
+        '.email => 'email',
+
+
+    my $pure = Template::Pure->new(
+      template => $html,
+      directives => [
+        '#contact' => {
+          'contact' => $contact_include;
+        },
+      ]
+    );
+
+    print $pure->render({
+      person => {
+        contact => {
+          fullname => 'John Doe',
+          email => 'jd@email.com'.
+        }
+      },
+    });
+
+This lets you isolate the data structure of your includes to improve reuse and clarity.
+
 ## Hashref - Create a Loop
 
 Besides moving the current data context, setting the value of a match spec key to a
@@ -1214,7 +1252,8 @@ John Napiorkowski [email:jjnapiork@cpan.org](email:jjnapiork@cpan.org)
 
 # SEE ALSO
 
-[DOM::Tiny](https://metacpan.org/pod/DOM::Tiny), [Catalyst::View::Template::Pure](https://metacpan.org/pod/Catalyst::View::Template::Pure).
+[DOM::Tiny](https://metacpan.org/pod/DOM::Tiny), [HTML::Zoom](https://metacpan.org/pod/HTML::Zoom).  Both of these are approaches to programmatically examining and
+altering a DOM.
 
 [Template::Semantic](https://metacpan.org/pod/Template::Semantic) is a similar system that uses XPATH instead of a CSS inspired matching
 specification.  It has more dependencies (including [XML::LibXML](https://metacpan.org/pod/XML::LibXML) and doesn't separate the actual
