@@ -1,5 +1,9 @@
 The following logs changes for the CPAN distribution Template::Pure
 
+0.006   15 March 2016
+        - Removed some testing code accidentally left in the distribution
+          in the last release
+
 0.005   14 March 2016
         - pod tests and pod fixes (manwar++)
         - Setup for Travis CI
