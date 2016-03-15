@@ -32,7 +32,7 @@ ok my $data = +{
 ok my $string = $pure->render($data);
 ok my $dom = DOM::Tiny->new($string);
 
-is $dom->at('#story ')->content, 'INNER STUFF XXXXXXXXXXXXXXXXXXXX on 1/1/2020';
+is $dom->at('#story ')->content, 'INNER STUFF: XXXXXXXXXXXXXXXXXXXX on 1/1/2020';
 is $dom->at('#footer')->content, 'Inner Stuff on 1/1/2020';
 
 done_testing; 

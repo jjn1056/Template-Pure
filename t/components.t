@@ -23,6 +23,9 @@ use Template::Pure;
       directives=>[$self->directives])
   }
 
+  sub on_load { }
+  sub on_attach {  }
+
   sub process {
     my ($self, $dom, $data) = @_;
     $dom->replace(

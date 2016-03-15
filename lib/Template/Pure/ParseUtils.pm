@@ -14,13 +14,13 @@ sub parse_data_template {
   my ($spec) = @_;
   $spec=~s/\r|\n//gs; # cleanup newlines.
 
-  my $opentag = qr/=\{/;
-  my $closetag = qr/\}/;
+  my $opentag = qr/={/;
+  my $closetag = qr/}/;
   my $placeholder = qr{(
     (?:
       $opentag ( 
         (?:
-          (?> [^\=\{\}]+ )
+          (?> [^={}]+ )
           |
           (?2)
         )*
@@ -29,7 +29,7 @@ sub parse_data_template {
   )}x;
 
   my @parts;
-  while($spec =~/( [^$opentag]+ ) | $placeholder /gx) {
+  while($spec =~/( [^={]+ ) | $placeholder /gx) {
     my $part = $1||$2;
     if(my ($is_data_spec) = ($part=~/^$opentag(.+?)$closetag$/)) {
       push @parts, +{ parse_data_spec($is_data_spec) };
@@ -37,7 +37,6 @@ sub parse_data_template {
       push @parts, $part;
     }
   }
-
   return @parts;
 }
 
