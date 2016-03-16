@@ -1,5 +1,9 @@
 The following logs changes for the CPAN distribution Template::Pure
 
+0.007   16 March 2016
+        - You may now assign the value of an action to any object that does
+          a method called 'TO_HTML'.
+
 0.006   15 March 2016
         - Removed some testing code accidentally left in the distribution
           in the last release

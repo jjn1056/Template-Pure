@@ -3,7 +3,7 @@ use warnings;
 
 package Template::Pure;
 
-our $VERSION = '0.006';
+our $VERSION = '0.007';
 
 use DOM::Tiny;
 use Scalar::Util;
@@ -83,6 +83,8 @@ sub _process_dom_recursive {
       $self->process_sub_directives($dom, $data->value, $match_spec{css}, @{$action_proto});
     } elsif((ref($action_proto)||'') eq 'CODE') {
       $self->_process_code($dom, $data, $action_proto, %match_spec);
+    } elsif(Scalar::Util::blessed($action_proto)) {
+      $self->_process_obj($dom, $data, $action_proto, %match_spec);
     } else {
       my $value = $self->_value_from_action_proto($dom, $data, $action_proto, %match_spec);
       $self->_process_match_spec($dom, $value, %match_spec);
@@ -92,17 +94,35 @@ sub _process_dom_recursive {
   return $dom;
 }
 
+sub _process_obj {
+  my ($self, $dom, $data, $obj, %match_spec) = @_;
+  if($obj->isa(ref $self)) {
+    my $value = $self->_value_from_template_obj($dom, $data, $obj, %match_spec);
+    $self->_process_match_spec($dom, $value, %match_spec);
+  } elsif($obj->can('TO_HTML')) {
+    my $css = $match_spec{css};
+    if($css eq '.') {
+      my $value = $obj->TO_HTML($self, $dom, $data->value);
+      $self->_process_mode($dom, $value, %match_spec);
+    } else {
+      my $collection = $dom->find($css);
+      $collection->each(sub {
+        my $value = $obj->TO_HTML($self, $_, $data->value);
+        $self->_process_mode($_, $value, %match_spec);
+      });
+    }
+  } else {
+    die "Can't process object of type $obj.";
+  }
+
+}
+
 sub _value_from_action_proto {
   my ($self, $dom, $data, $action_proto, %match_spec) = @_;
   if(ref \$action_proto eq 'SCALAR') {
     return $self->_value_from_scalar_action($data, $action_proto);
   } elsif((ref($action_proto)||'') eq 'SCALAR') {
     return $self->_value_from_dom($dom, $$action_proto);
-  } elsif((ref($action_proto)||'') eq 'CODE') {
-    ## TODO, probably wrong when the CSS matches more than one node
-    return $action_proto->($self, $self->at_or_die($dom, $match_spec{css}), $data->value);
-  } elsif(Scalar::Util::blessed($action_proto) && $action_proto->isa(ref $self)) {
-    return $self->_process_template_obj($dom, $data, $action_proto, %match_spec);
   } else {
     die "I encountered an action I don't know what to do with: $action_proto";
   }
@@ -151,7 +171,7 @@ sub _process_code {
   }
 }
 
-sub _process_template_obj {
+sub _value_from_template_obj {
   my ($self, $dom, $data, $template, %match_spec) = @_;
   my $content = $self->_value_from_dom($dom, \%match_spec);
   my $new_data = Template::Pure::DataProxy->new(
@@ -232,7 +252,7 @@ sub _process_sub_data {
       $self->process_sub_directives($dom, $value, $css, @{$sub_data_action});
     } elsif(Scalar::Util::blessed($sub_data_action) && $sub_data_action->isa(ref $self)) {
       my $new_data = Template::Pure::DataContext->new($value);
-      my $new_value = $self->_process_template_obj($dom, $new_data, $sub_data_action, %$match_spec);
+      my $new_value = $self->_value_from_template_obj($dom, $new_data, $sub_data_action, %$match_spec);
       $self->_process_match_spec($dom, $new_value, %$match_spec);      
     } else {
       die "Don't know how to process $value on $css for $sub_data_action";
@@ -426,7 +446,7 @@ Template::Pure - Perlish Port of pure.js
           <ul id="friendlist">
             <li>Friends</li>
           </ul>
-        </body>
+        </body> 
       </html>
     ];
 
@@ -880,7 +900,7 @@ For example:
       ],
       directives => [
         '.name' => 'fullname',
-        '.email => 'email',
+        '.email' => 'email',
 
 
     my $pure = Template::Pure->new(
@@ -1401,6 +1421,66 @@ Results in:
         burning but there&amp;#39;s never enough wood.
       </section>
         <p id="foot">Here&#39;s the footer</p>
+      </body>
+    </html>
+
+=head2 Object - Any Object that does 'TO_HTML'
+
+In addition to using a L<Template::Pure> object as the target action for
+a match specification, you may use any object that does a method called
+'TO_HTML'.  Such a method would expect to recieve the current template
+object, the current matched DOM, and the current value of the Data context
+as arguments.  It should return a string that is used as the replacement
+value for the given match specification.  For example:
+
+    {
+      package Local::Example;
+
+      sub new {
+        my ($class, %args) = @_;
+        return bless \%args, $class;
+      }
+
+      sub TO_HTML {
+        my ($self, $pure, $dom, $data) = @_;
+        return $dom->attr('class');
+      }
+    }
+
+    my $html = q[
+      <html>
+        <head>
+          <title>Page Title</title>
+        </head>
+        <body>
+          <p class="foo">aaa</a>
+          <p class="bar">bbb</a>
+        </body>
+      </html>
+    ];
+
+    my $pure = Template::Pure->new(
+      template=>$html,
+      directives=> [
+        'title' => 'title',
+        'p' => Local::Example->new,
+      ]);
+
+    my $data = +{
+      title => 'A Shadow Over Innsmouth',
+    };
+
+    print $pure->render($data);
+
+Results in:
+
+    <html>
+      <head>
+        <title>A Shadow Over Innsmouth</title>
+      </head>
+      <body>
+        <p class="foo">foo</p>
+        <p class="bar">bar</p>
       </body>
     </html>
 
