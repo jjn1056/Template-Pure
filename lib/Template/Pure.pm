@@ -87,7 +87,11 @@ sub _process_dom_recursive {
       $self->_process_obj($dom, $data, $action_proto, %match_spec);
     } else {
       my $value = $self->_value_from_action_proto($dom, $data, $action_proto, %match_spec);
-      $self->_process_match_spec($dom, $value, %match_spec);
+      if(Scalar::Util::blessed($value) && $value->isa('Template::Pure')) {
+        $self->_process_obj($dom, $data, $value, %match_spec);
+      } else {
+        $self->_process_match_spec($dom, $value, %match_spec);
+      }
     }
   }
 

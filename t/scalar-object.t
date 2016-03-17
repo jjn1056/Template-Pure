@@ -23,8 +23,8 @@ ok my $template = qq[
 ];
 
 ok my @directives = (
-  title => 'title',
-  body => 'content',
+  title => 'title | upper',
+  body => 'info',
 );
 
 ok my $pure = Template::Pure->new(
@@ -33,11 +33,16 @@ ok my $pure = Template::Pure->new(
 
 ok my $data = +{
   title => 'Scalar objects',
-  content => $wrapper,
+  info => $wrapper,
 };
 
-my $string = $pure->render($data);
+ok my $string = $pure->render($data);
+ok my $dom = DOM::Tiny->new($string);
 
 warn $string;
+
+is $dom->at('body section p')->content, 'Hi Di Ho!';
+is $dom->at('title')->content, 'SCALAR OBJECTS';
+
 
 done_testing;
