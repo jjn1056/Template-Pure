@@ -39,8 +39,6 @@ ok my $data = +{
 ok my $string = $pure->render($data);
 ok my $dom = DOM::Tiny->new($string);
 
-warn $string;
-
 is $dom->at('body section p')->content, 'Hi Di Ho!';
 is $dom->at('title')->content, 'SCALAR OBJECTS';
 
