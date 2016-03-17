@@ -22,6 +22,7 @@ sub AUTOLOAD {
   my $self = shift;
   ( my $method = $AUTOLOAD ) =~ s{.*::}{};
   if(Scalar::Util::blessed $self->{data}) {
+    die "Proxy inside Proxy..." if $self->{data}->isa(ref $self);
     if($self->{data}->can($method)) {
       return $self->{data}->$method;
     } elsif(exists $self->{extra}{$method}) {

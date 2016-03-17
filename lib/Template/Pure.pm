@@ -96,11 +96,35 @@ sub _process_dom_recursive {
 
 sub _process_obj {
   my ($self, $dom, $data, $obj, %match_spec) = @_;
+  my $css = $match_spec{css};
+
   if($obj->isa(ref $self)) {
-    my $value = $self->_value_from_template_obj($dom, $data, $obj, %match_spec);
-    $self->_process_match_spec($dom, $value, %match_spec);
+    if($css eq '.') {
+      my $value = $self->_value_from_template_obj($dom, $data, $obj, %match_spec);
+      $self->_process_mode($dom, $value, %match_spec);
+    } else {
+      my $collection = $dom->find($css);
+      $collection->each(sub {
+
+        my $content;
+        if($match_spec{target} eq 'content') {
+          $content = $self->encoded_string($_->content);
+        } elsif($match_spec{target} eq 'node') {
+          $content = $self->encoded_string($_->to_string);
+        } elsif(my $attr = ${$match_spec{target}}) {
+          $content = $_->attr($attr);
+        }
+
+        my $new_data = Template::Pure::DataProxy->new(
+          $data->value,
+          content => $self->encoded_string($content));
+
+        my $value = $self->encoded_string($obj->render($new_data));
+
+        $self->_process_mode($_, $value, %match_spec);
+      });
+    }
   } elsif($obj->can('TO_HTML')) {
-    my $css = $match_spec{css};
     if($css eq '.') {
       my $value = $obj->TO_HTML($self, $dom, $data->value);
       $self->_process_mode($dom, $value, %match_spec);
@@ -114,7 +138,6 @@ sub _process_obj {
   } else {
     die "Can't process object of type $obj.";
   }
-
 }
 
 sub _value_from_action_proto {

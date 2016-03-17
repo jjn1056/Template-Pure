@@ -2,12 +2,12 @@ use Test::Most;
 use Template::Pure;
 
 ok my $wrapper_html = qq[
-  <section>Example Wrapped Stuff</section>];
+  <span>Example Wrapped Stuff</span>];
 
 ok my $wrapper = Template::Pure->new(
   template=>$wrapper_html,
   directives=> [
-    'section' => 'content',
+    'span' => 'content',
   ]);
 
 ok my $to_wrap_html = qq[
@@ -16,10 +16,8 @@ ok my $to_wrap_html = qq[
       <title>Page Title: </title>
     </head>
     <body>
-      <div>foo<span id='inner'>ffff</span></div>
-      <div>bar
-        <div>baz</div>
-      </div>
+      <div id="foo">foo</div>
+      <div id="bar">bar</div>
     </body>
   </html>
 ];
@@ -28,17 +26,18 @@ ok my $to_wrap = Template::Pure->new(
   template=>$to_wrap_html,
   directives=> [
     'title+' => 'meta.title',
-    '^div' => $wrapper,
-    'span#inner' => {
-      meta => [
-        '.' => 'author',
-      ],
-    },
+    'div' => $wrapper,
   ]
 );
 
 ok my $rendered_template = $to_wrap->render({
   meta => { title=>'My Title', author=>'jnap' },
 });
+
+ok my $dom = DOM::Tiny->new($rendered_template);
+
+is $dom->at('title')->content, 'Page Title: My Title';
+is $dom->at('#foo span')->content, 'foo';
+is $dom->at('#bar span')->content, 'bar';
 
 done_testing;
