@@ -20,7 +20,7 @@ ok my $pure = Template::Pure->new(
   ]
 );
 
-ok $pure->{dom};
+ok $pure->{template};
 ok $pure->{directives};
 ok $pure->{filters};
 

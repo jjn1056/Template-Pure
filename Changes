@@ -1,5 +1,8 @@
 The following logs changes for the CPAN distribution Template::Pure
 
+0.009   17 March 2016
+        - Make sure templates state is properly reset.
+
 0.008   17 March 2016
         - Fixed issue with wrapper templates
         - New Feature: you may now set a template object in the data section

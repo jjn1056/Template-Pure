@@ -3,7 +3,7 @@ use warnings;
 
 package Template::Pure;
 
-our $VERSION = '0.008';
+our $VERSION = '0.009';
 
 use DOM::Tiny;
 use Scalar::Util;
@@ -17,23 +17,27 @@ use Template::Pure::Iterator;
 sub new {
   my ($proto, %args) = @_;
   my $class = ref($proto) || $proto;
+
+  die '"template" is required' unless $args{template};
+
   return bless +{
     filters => $args{filters} || +{},
-    dom => DOM::Tiny->new($args{template}),
+    template => $args{template},
     directives => $args{directives},
   }, $class;
 }
 
 sub render {
   my ($self, $data_proto, $extra_directives) = @_;
-  return $self->process_dom($data_proto, $extra_directives)->to_string;
+  my $dom = DOM::Tiny->new($self->{template});
+  return $self->process_dom($dom, $data_proto, $extra_directives)->to_string;
 }
 
 sub process_dom {
-  my ($self, $data_proto, $extra_directives) = @_;
+  my ($self, $dom, $data_proto, $extra_directives) = @_;
   return $self->_process_dom_recursive(
     $data_proto,
-    $self->{dom},
+    $dom,
     @{$self->{directives}},
     @{$extra_directives||[]},
   );
