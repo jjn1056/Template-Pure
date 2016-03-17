@@ -44,5 +44,4 @@ warn $string;
 is $dom->at('body section p')->content, 'Hi Di Ho!';
 is $dom->at('title')->content, 'SCALAR OBJECTS';
 
-
 done_testing;

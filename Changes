@@ -1,5 +1,10 @@
 The following logs changes for the CPAN distribution Template::Pure
 
+0.008   17 March 2016
+        - Fixed issue with wrapper templates
+        - New Feature: you may now set a template object in the data section
+          and expect it to render.
+
 0.007   16 March 2016
         - You may now assign the value of an action to any object that does
           a method called 'TO_HTML'.

@@ -3,7 +3,7 @@ use warnings;
 
 package Template::Pure;
 
-our $VERSION = '0.007';
+our $VERSION = '0.008';
 
 use DOM::Tiny;
 use Scalar::Util;
@@ -710,6 +710,62 @@ current data context, for example:
     );
 
 In this case the value of the node indicated by '#last_name' will be set to 'Lovecraft'.
+
+B<NOTE>: If your scalar action returns a L<Template::Pure> object, it will render as if
+it was an object action as described below L</Object - Set the match value to another Pure Template>.
+
+For example:
+
+    my $wrapper_html = qq[
+      <section>Example Wrapped Stuff</section>];
+
+    my $wrapper = Template::Pure->new(
+      template=>$wrapper_html,
+      directives=> [
+        'section' => 'content',
+      ]);
+
+    my $template = qq[
+     <html>
+        <head>
+          <title>Title Goes Here!</title>
+        </head>
+        <body>
+          <p>Hi Di Ho!</p>
+        </body>
+      </html>    
+    ];
+
+    my @directives = (
+      title => 'title | upper',
+      body => 'info',
+    );
+
+    my $pure = Template::Pure->new(
+      template => $template,
+      directives => \@directives);
+
+    my $data = +{
+      title => 'Scalar objects',
+      info => $wrapper,
+    };
+
+    ok my $string = $pure->render($data);
+
+Results in:
+
+   <html>
+      <head>
+        <title>SCALAR OBJECTS</title>
+      </head>
+      <body>
+    <section>
+        <p>Hi Di Ho!</p>
+      </section></body>
+    </html>
+
+This feature is currently only active for scalar actions but may be extended to other action
+types in the future.
 
 =head2 ScalarRef - Set the value to the results of a match
 
