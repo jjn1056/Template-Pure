@@ -1,5 +1,13 @@
 The following logs changes for the CPAN distribution Template::Pure
 
+0.010   21 March 2016
+        - I'm setting the minimum Perl version to 5.10.0 since we are using
+          some regular expression constructs that only work on 5.10+ and its making
+          the testing reports noisy.  I'd love to support 5.8.8 if I could, if anyone
+          is a regexp ninja and wants to help, the issue is in Template::Pure::ParseUtils
+          where I am using named/number capture buffers (that requires 5.10+).  If we can
+          redo that regexp to not use those features that would grant us 5.8 compatibility.
+
 0.009   17 March 2016
         - Make sure templates state is properly reset.
 

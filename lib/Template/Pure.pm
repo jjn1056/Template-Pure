@@ -3,7 +3,7 @@ use warnings;
 
 package Template::Pure;
 
-our $VERSION = '0.009';
+our $VERSION = '0.010';
 
 use DOM::Tiny;
 use Scalar::Util;
