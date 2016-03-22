@@ -3,7 +3,7 @@ use warnings;
 
 package Template::Pure;
 
-our $VERSION = '0.010';
+our $VERSION = '0.011';
 
 use DOM::Tiny;
 use Scalar::Util;
@@ -91,7 +91,7 @@ sub _process_dom_recursive {
       $self->_process_obj($dom, $data, $action_proto, %match_spec);
     } else {
       my $value = $self->_value_from_action_proto($dom, $data, $action_proto, %match_spec);
-      if(Scalar::Util::blessed($value) && $value->isa('Template::Pure')) {
+      if(Scalar::Util::blessed($value) && ($value->isa('Template::Pure') || $value->can('TO_HTML') ) ) {
         $self->_process_obj($dom, $data, $value, %match_spec);
       } else {
         $self->_process_match_spec($dom, $value, %match_spec);
