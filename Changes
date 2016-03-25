@@ -1,5 +1,9 @@
 The following logs changes for the CPAN distribution Template::Pure
 
+0.012   25 March 2016
+        - Require the newest version of DOM::Tiny
+        - You may now set the target of an action to a DOM::Tiny object instance.
+
 0.011   22 March 2016
         - Now if the result of a scalar action is an object that does 'TO_HTML' we
           process the object rather than stringify it.

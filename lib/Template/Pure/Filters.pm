@@ -43,8 +43,10 @@ sub escape_html {
     q{'} => '&#39;' );
 
   if(
-    Scalar::Util::blessed($value) && 
-    $value->isa('Template::Pure::EncodedString')
+    Scalar::Util::blessed($value) && ( 
+      $value->isa('Template::Pure::EncodedString') ||
+      $value->isa('DOM::Tiny')
+    )
   ) {
     return $value;
   } else {

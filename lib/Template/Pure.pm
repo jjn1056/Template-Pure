@@ -3,7 +3,7 @@ use warnings;
 
 package Template::Pure;
 
-our $VERSION = '0.011';
+our $VERSION = '0.012';
 
 use DOM::Tiny;
 use Scalar::Util;
@@ -31,6 +31,38 @@ sub render {
   my ($self, $data_proto, $extra_directives) = @_;
   my $dom = DOM::Tiny->new($self->{template});
   return $self->process_dom($dom, $data_proto, $extra_directives)->to_string;
+}
+
+{
+  package Template::Pure::_Result;
+
+  sub process {
+    my ($self, $data, $directives) = @_;
+    my $dom = $self->{pure}->_process_dom_recursive(
+       $self->{dom},
+      $data,
+      @{$directives});
+
+    return $self->{dom} = $dom;
+  }
+
+  sub render {
+    my $self = shift;
+    return $self->{pure}->process_dom(
+      $self->{dom}, shift, shift)->to_string;
+  }
+}
+
+sub process {
+  my ($self, $data, $directives) = @_;
+  my $dom = $self->_process_dom_recursive(
+    DOM::Tiny->new($self->{template}),
+    $data,
+    @{$directives});
+
+  return bless +{ 
+    pure => $self,
+    dom => $dom }, 'Template::Pure::_Result';
 }
 
 sub process_dom {
@@ -143,6 +175,8 @@ sub _process_obj {
         $self->_process_mode($_, $value, %match_spec);
       });
     }
+  } elsif($obj->isa('DOM::Tiny')) {
+      $self->_process_match_spec($dom, $obj, %match_spec);
   } else {
     die "Can't process object of type $obj.";
   }
@@ -333,13 +367,16 @@ sub _value_from_dom {
   ## a collection, which populates an iterator if requested?
 
   if($match_spec{target} eq 'content') {
-    return $self->encoded_string($self->at_or_die($dom, $match_spec{css})->content);
+    #return $self->encoded_string($self->at_or_die($dom, $match_spec{css})->content);
+    # Not sure if there is a more effecient way to make this happen...
+    return DOM::Tiny->new($self->at_or_die($dom, $match_spec{css})->content);
   } elsif($match_spec{target} eq 'node') {
     ## When we want a full node, with HTML tags, we encode the string
     ## since I presume they want a copy not escaped.  T 'think' this is
     ## the commonly desired thing and you can always apply and escape_html filter
     ## yourself when you don't want it.
-    return $self->encoded_string($self->at_or_die($dom, $match_spec{css})->to_string);
+    #return $self->encoded_string($self->at_or_die($dom, $match_spec{css})->to_string);
+    return $self->at_or_die($dom, $match_spec{css});
   } elsif(my $attr = ${$match_spec{target}}) {
     ## TODO not sure what if any encoding we need here.
     return $self->at_or_die($dom, $match_spec{css})->attr($attr);
@@ -1508,6 +1545,46 @@ Results in:
         burning but there&amp;#39;s never enough wood.
       </section>
         <p id="foot">Here&#39;s the footer</p>
+      </body>
+    </html>
+
+=head2 Object - A DOM::Tiny instance
+
+In the case where you set the value of the action target to an instance of
+L<DOM::Tiny>, we let the value of that perform the replacement indicated by
+the match specification:
+
+    my $html = q[
+      <html>
+        <head>
+          <title>Page Title</title>
+        </head>
+        <body>
+          <p class="foo">aaa</a>
+        </body>
+      </html>
+    ];
+
+    my $pure = Template::Pure->new(
+      template=>$html,
+      directives=> [
+        'p' => DOM::Tiny->new("<a href='localhost:foo'>Foo!</a>"),
+      ]);
+
+    my $data = +{
+      title => 'A Shadow Over Innsmouth',
+    };
+
+    my $string = $pure->render($data);
+
+Results in:
+
+    <html>
+      <head>
+        <title>A Shadow Over Innsmouth/title>
+      </head>
+      <body>
+        <p class="foo"><a href='localhost:foo'>Foo!</a></a>
       </body>
     </html>
 
