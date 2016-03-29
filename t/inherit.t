@@ -75,6 +75,4 @@ is $dom->find('link')->[0]->attr('href'), '/css/pure-min.css';
 like $dom->at('body #content'), qr'<p>You are doomed to discover';
 like $dom->find('script')->[0]->content, qr'function foo';
 
-warn $string;
-
 done_testing; 

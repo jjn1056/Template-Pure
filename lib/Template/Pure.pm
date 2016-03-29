@@ -33,38 +33,6 @@ sub render {
   return $self->process_dom($dom, $data_proto, $extra_directives)->to_string;
 }
 
-{
-  package Template::Pure::_Result;
-
-  sub process {
-    my ($self, $data, $directives) = @_;
-    my $dom = $self->{pure}->_process_dom_recursive(
-       $self->{dom},
-      $data,
-      @{$directives});
-
-    return $self->{dom} = $dom;
-  }
-
-  sub render {
-    my $self = shift;
-    return $self->{pure}->process_dom(
-      $self->{dom}, shift, shift)->to_string;
-  }
-}
-
-sub process {
-  my ($self, $data, $directives) = @_;
-  my $dom = $self->_process_dom_recursive(
-    DOM::Tiny->new($self->{template}),
-    $data,
-    @{$directives});
-
-  return bless +{ 
-    pure => $self,
-    dom => $dom }, 'Template::Pure::_Result';
-}
-
 sub process_dom {
   my ($self, $dom, $data_proto, $extra_directives) = @_;
   return $self->_process_dom_recursive(

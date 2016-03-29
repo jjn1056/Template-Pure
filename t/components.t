@@ -67,12 +67,12 @@ BEGIN {
 }
 
 ok my $html_template = qq[
-  <?pure-wrap on='^body' src='wrapper.html'?>
   <?pure-component src='Localtime' as='pure-localtime'?>
   <html>
     <head>
       <title>Page Title: </title>
     </head>
+    <?pure-wrap src='wrapper.html'?>
     <body>
       <p>Time in NYC: <pure-localtime id='time_nyc' tz='America/New_York'/></p>
       <p>Time in Chicago: <pure-localtime id='time_chi' tz='America/Chicago' /></p>
