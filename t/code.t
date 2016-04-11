@@ -21,7 +21,7 @@ ok my $pure = Template::Pure->new(
       my ($template, $dom, $data) = @_;
       Test::Most::is ref($template), 'Template::Pure';
       Test::Most::is "$dom", "<p>".$dom->content."</p>";
-      return $data->{$dom->content};
+      return $template->data_at_path($data, $dom->content)
     }
   ]);
 
@@ -32,6 +32,8 @@ ok my $data = +{
 
 ok my $string = $pure->render($data);
 ok my $dom = DOM::Tiny->new($string);
+
+#warn $string;
 
 is $dom->find('p')->[0]->content, 'foo is you';
 is $dom->find('p')->[1]->content, 'baz is raz';

@@ -3,7 +3,7 @@ use warnings;
 
 package Template::Pure;
 
-our $VERSION = '0.012';
+our $VERSION = '0.013';
 
 use DOM::Tiny;
 use Scalar::Util;
@@ -30,6 +30,9 @@ sub new {
 sub render {
   my ($self, $data_proto, $extra_directives) = @_;
   my $dom = DOM::Tiny->new($self->{template});
+  
+  $data_proto = Template::Pure::DataProxy->new($data_proto, self=>$self);
+
   return $self->process_dom($dom, $data_proto, $extra_directives)->to_string;
 }
 
@@ -54,6 +57,11 @@ sub encoded_string { Template::Pure::EncodedString->new($_[1]) }
 sub data_at_path {
   my ($self, $data, $path) = @_;
   my %data_spec = $self->parse_data_spec($path);
+
+  unless(Scalar::Util::blessed($data) and $data->isa('Template::Pure::DataContext') ) {
+    $data = Template::Pure::DataContext->new($data, $self->{root_data});
+  }
+
   return $self->_value_from_data($data, %data_spec);
 }
 
@@ -837,7 +845,8 @@ or:
       directives => [
         '#name' => sub {
           my ($instance, $dom, $data) = @_;
-          return $data->{id}{first_name} .' '. $data->{id}{first_name}; 
+          return $instance->data_at_path($data, 'id.first_name') .' '. 
+            $instance->data_at_path($data, 'id.last_name') ; 
         },
       ]
     );
@@ -868,22 +877,12 @@ arguments:
 Your just need to return the value desired which will substitute for the matched node's
 current value.
 
-B<NOTE>: It might be a good idea to try and maintain as much implementation independence
-from you $data model as possible.  That way if later you change your $data from a hashref
-to an instance of an object you won't break your code.  One way to help achieve this is
-to use L<Template::Pure>'s data lookup helper methods (which support dot notation and more
-as described below.  For example consider re-writing the above example like this:
-
-    my $pure = Template::Pure->new(
-      template => $html,
-      directives => [
-        '#name' => sub {
-          my ($instance, $dom, $data) = @_;
-          return $instance->data_at_path($data, 'id.first_name') .' '. 
-            $instance->data_at_path($data, 'id.last_name') ; 
-        },
-      ]
-    );
+B<NOTE>: Please note in the above example code that we used 'data_at_path' rather than
+dereferenced the $data scalar directly.  This is required since internally we wrap your
+$data in helper objects, so you can't be 100% certain of the actual structure.  In general
+using this method wouldbe a good idea anyway since it lets you achieve an API that is
+complete independent of your actual data structure (this way if you later change from a 
+simple hashref to an object, your code wouldn't break.
 
 =head2 Arrayref - Run directives under a new DOM root
 

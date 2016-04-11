@@ -15,20 +15,41 @@ sub new {
   }, $class;
 }
 
-sub can { 1 } # Evil, sorry
+sub can { 
+  my ($self, $target) = @_;
+  if(Scalar::Util::blessed $self->{data}) {
+    if($self->{data}->can($target)) {
+      return 1;
+    } elsif(exists $self->{extra}{$target}) {
+      return 1;
+    } else {
+      return 0;
+    }
+  } else {
+    if(exists $self->{data}{$target}) {
+      return 1;
+    } elsif(exists $self->{extra}{$target}) {
+      return 1;
+    } else {
+      return 0;
+    }
+  }
+}
 
 sub AUTOLOAD {
   return if our $AUTOLOAD =~ /DESTROY/;
   my $self = shift;
   ( my $method = $AUTOLOAD ) =~ s{.*::}{};
+
   if(Scalar::Util::blessed $self->{data}) {
-    die "Proxy inside Proxy..." if $self->{data}->isa(ref $self);
+    #warn "Proxy inside Proxy..." if $self->{data}->isa(ref $self);
     if($self->{data}->can($method)) {
       return $self->{data}->$method;
     } elsif(exists $self->{extra}{$method}) {
       return $self->{extra}{$method};
     } else {
-      die "No value at $method for $self";
+      return;
+      #die "No value at $method for $self";
     }
   } else {
     ## I think we can assume its a hashref then.
@@ -37,7 +58,8 @@ sub AUTOLOAD {
     } elsif(exists $self->{extra}{$method}) {
       return $self->{extra}{$method};
     } else {
-      die "No value at $method in: ".Dumper $self;
+      return;
+      #die "No value at $method in: ".Dumper($self->{data}) ."\n or \n". Dumper($self->{extra});
     }
   }
 }

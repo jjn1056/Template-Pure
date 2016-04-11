@@ -33,7 +33,7 @@ sub at {
       } elsif($at->{optional}) {
         $current = undef;
       } else {
-        die "Missing path '$key'";
+        die "Missing path '$key' in data context ". Dumper($current);
       }
     } elsif(ref $current eq 'HASH') {
       if(exists $current->{$key}) {

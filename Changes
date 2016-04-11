@@ -1,5 +1,14 @@
 The following logs changes for the CPAN distribution Template::Pure
 
+0.013   11 April 2016
+        - We now expose 'self', the current instance of the Pure object in your
+          data context.  This makes it easier to follow the new best practice
+          recommendation of using a subclass to encapsulate your view logic and
+          view related data.
+        - Using 'data_at_path' is now required in coderef actions where you are
+          pulling values out of the data context.  This could be a breaking change
+          if you did not follow the recommended best practice.
+
 0.012   25 March 2016
         - Require the newest version of DOM::Tiny
         - You may now set the target of an action to a DOM::Tiny object instance.

@@ -31,7 +31,7 @@ BEGIN {
   sub on_load { }
   sub on_attach {  }
 
-  sub process {
+  sub render_this {
     my ($self, $dom, $data) = @_;
     $dom->replace(
       $self->render({
@@ -67,16 +67,16 @@ BEGIN {
 }
 
 ok my $html_template = qq[
-  <?pure-component src='Localtime' as='pure-localtime'?>
+  <?pure-component src='Localtime' as='pure-localtime' ctx='settings.time'?>
   <html>
     <head>
       <title>Page Title: </title>
     </head>
-    <?pure-wrap src='wrapper.html'?>
+    <?pure-wrapper src='wrapper.html' mode="append|prepend|replace" target="node|content" ctx="meta" ?>
     <body>
       <p>Time in NYC: <pure-localtime id='time_nyc' tz='America/New_York'/></p>
       <p>Time in Chicago: <pure-localtime id='time_chi' tz='America/Chicago' /></p>
-      <?pure-include src='={base}/footer.html'?>
+      <?pure-include src='={base}/footer.html' ctx='meta.info' ?>
     </body>
   </html>
 ];
@@ -88,7 +88,7 @@ ok my $pure = Template::Pure->new(
     'pure-localtime|' => sub {
       my ($t, $dom, $data) = @_;
       my $localtime = Lace::Component::Localtime->new(%{$dom->attr||+{}});
-      $localtime->process($dom, $data);
+      $localtime->render_this($dom, $data);
     }
   ]
 );
