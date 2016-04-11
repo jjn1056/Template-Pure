@@ -14,7 +14,13 @@ BEGIN {
 
   has 'version' => (is=>'ro', required=>1);
 
-  sub time { scalar localtime }
+  sub time {
+    return sub {
+    my ($self, $dom, $data) = @_;
+    $dom->attr(foo=>'bar');
+    return 'Mon Apr 11 10:49:42 2016';
+    };
+  }
 }
 
 ok my $html_template = qq[
@@ -38,7 +44,6 @@ ok my $pure = Local::Template::Pure::Custom->new(
     '#version' => 'self.version',
     '#main' => 'story',
     '#foot' => 'self.time',
-
   ]
 );
 
@@ -53,9 +58,10 @@ ok my $data = +{
 ok my $string = $pure->render($data);
 ok my $dom = DOM::Tiny->new($string);
 
-#is $dom->at('title'), '<title>Doomed Poem</title>';
-#like $dom->at('body'), qr/Are you doomed to discover that/;
-
-warn $string;
+is $dom->at('title'), '<title>A subclass</title>';
+is $dom->at('#version')->content, '100';
+is $dom->at('#main')->content, 'XXX';
+is $dom->at('#foot')->content, 'Mon Apr 11 10:49:42 2016';
+is $dom->at('#foot')->attr('foo'), 'bar';
 
 done_testing;

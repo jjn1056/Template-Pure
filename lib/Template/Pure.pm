@@ -101,6 +101,8 @@ sub _process_dom_recursive {
       my $value = $self->_value_from_action_proto($dom, $data, $action_proto, %match_spec);
       if(Scalar::Util::blessed($value) && ($value->isa('Template::Pure') || $value->can('TO_HTML') ) ) {
         $self->_process_obj($dom, $data, $value, %match_spec);
+      } elsif((ref($value)||'') eq 'CODE') {
+        $self->_process_code($dom, $data, $value, %match_spec);
       } else {
         $self->_process_match_spec($dom, $value, %match_spec);
       }
@@ -783,6 +785,9 @@ Results in:
 
 This feature is currently only active for scalar actions but may be extended to other action
 types in the future.
+
+B<NOTE> If your scalar action returns a coderefence, we process it as if the
+scalar action was itself a code reference.  See L<\'Coderef - Programmatically replace the value indicated'>.
 
 =head2 ScalarRef - Set the value to the results of a match
 
@@ -1672,6 +1677,83 @@ path as undefined:
       'copyright => 'meta.maybe:license_info.copyright_date',
       ...,
     ],
+
+=head2 Defaults in your Data Context
+
+By default there will be a key 'self' in your data context which refers to
+the current instance of your L<Template::Pure>.  This is handy for introspection
+and for subclassing:
+
+    {
+      package Local::Template::Pure::Custom;
+
+      use Moo;
+      extends 'Template::Pure';
+
+      has 'version' => (is=>'ro', required=>1);
+
+      sub time { return 'Mon Apr 11 10:49:42 2016' }
+    }
+
+    my $html_template = qq[
+      <html>
+        <head>
+          <title>Page Title</title>
+        </head>
+        <body>
+          <div id='version'>Version</div>
+          <div id='main'>Test Body</div>
+          <div id='foot'>Footer</div>
+        </body>
+      </html>
+    ];
+
+    my $pure = Local::Template::Pure::Custom->new(
+      version => 100,
+      template=>$html_template,
+      directives=> [
+        'title' => 'meta.title',
+        '#version' => 'self.version',
+        '#main' => 'story',
+        '#foot' => 'self.time',
+      ]
+    );
+
+Results in:
+
+    <html>
+      <head>
+        <title>A subclass</title>
+      </head>
+      <body>
+        <div id="version">100</div>
+        <div id="main">XXX</div>
+        <div id="foot">Mon Apr 11 10:49:42 2016</div>
+      </body>
+    </html>
+
+Creating subclasses of L<Template::Pure> to encapsulate some of the view
+data abd view logic should probably be considered a best practice approach.
+
+B<NOTE> if you create a subclass and want your methods to have access to
+and to modify the DOM, you can return a CODEREF:
+
+    {
+      package Local::Template::Pure::Custom;
+
+      use Moo;
+      extends 'Template::Pure';
+
+      has 'version' => (is=>'ro', required=>1);
+
+      sub time {
+        return sub {
+        my ($self, $dom, $data) = @_;
+        $dom->attr(foo=>'bar');
+        return 'Mon Apr 11 10:49:42 2016';
+        };
+      }
+    }
 
 =head2 Remapping Your Data Context
 
