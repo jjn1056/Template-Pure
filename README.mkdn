@@ -305,6 +305,9 @@ Results in:
 This feature is currently only active for scalar actions but may be extended to other action
 types in the future.
 
+**NOTE** If your scalar action returns a coderefence, we process it as if the
+scalar action was itself a code reference.  See ["\\'Coderef - Programmatically replace the value indicated'"](#coderef-programmatically-replace-the-value-indicated).
+
 ## ScalarRef - Set the value to the results of a match
 
 There may be times when you want to set the value of something to an existing
@@ -365,7 +368,8 @@ or:
       directives => [
         '#name' => sub {
           my ($instance, $dom, $data) = @_;
-          return $data->{id}{first_name} .' '. $data->{id}{first_name}; 
+          return $instance->data_at_path($data, 'id.first_name') .' '. 
+            $instance->data_at_path($data, 'id.last_name') ; 
         },
       ]
     );
@@ -395,22 +399,12 @@ arguments:
 Your just need to return the value desired which will substitute for the matched node's
 current value.
 
-**NOTE**: It might be a good idea to try and maintain as much implementation independence
-from you $data model as possible.  That way if later you change your $data from a hashref
-to an instance of an object you won't break your code.  One way to help achieve this is
-to use [Template::Pure](https://metacpan.org/pod/Template::Pure)'s data lookup helper methods (which support dot notation and more
-as described below.  For example consider re-writing the above example like this:
-
-    my $pure = Template::Pure->new(
-      template => $html,
-      directives => [
-        '#name' => sub {
-          my ($instance, $dom, $data) = @_;
-          return $instance->data_at_path($data, 'id.first_name') .' '. 
-            $instance->data_at_path($data, 'id.last_name') ; 
-        },
-      ]
-    );
+**NOTE**: Please note in the above example code that we used 'data\_at\_path' rather than
+dereferenced the $data scalar directly.  This is required since internally we wrap your
+$data in helper objects, so you can't be 100% certain of the actual structure.  In general
+using this method wouldbe a good idea anyway since it lets you achieve an API that is
+complete independent of your actual data structure (this way if you later change from a 
+simple hashref to an object, your code wouldn't break.
 
 ## Arrayref - Run directives under a new DOM root
 
@@ -1035,6 +1029,46 @@ Results in:
       </body>
     </html>
 
+## Object - A DOM::Tiny instance
+
+In the case where you set the value of the action target to an instance of
+[DOM::Tiny](https://metacpan.org/pod/DOM::Tiny), we let the value of that perform the replacement indicated by
+the match specification:
+
+    my $html = q[
+      <html>
+        <head>
+          <title>Page Title</title>
+        </head>
+        <body>
+          <p class="foo">aaa</a>
+        </body>
+      </html>
+    ];
+
+    my $pure = Template::Pure->new(
+      template=>$html,
+      directives=> [
+        'p' => DOM::Tiny->new("<a href='localhost:foo'>Foo!</a>"),
+      ]);
+
+    my $data = +{
+      title => 'A Shadow Over Innsmouth',
+    };
+
+    my $string = $pure->render($data);
+
+Results in:
+
+    <html>
+      <head>
+        <title>A Shadow Over Innsmouth/title>
+      </head>
+      <body>
+        <p class="foo"><a href='localhost:foo'>Foo!</a></a>
+      </body>
+    </html>
+
 ## Object - Any Object that does 'TO\_HTML'
 
 In addition to using a [Template::Pure](https://metacpan.org/pod/Template::Pure) object as the target action for
@@ -1152,6 +1186,83 @@ path as undefined:
       'copyright => 'meta.maybe:license_info.copyright_date',
       ...,
     ],
+
+## Defaults in your Data Context
+
+By default there will be a key 'self' in your data context which refers to
+the current instance of your [Template::Pure](https://metacpan.org/pod/Template::Pure).  This is handy for introspection
+and for subclassing:
+
+    {
+      package Local::Template::Pure::Custom;
+
+      use Moo;
+      extends 'Template::Pure';
+
+      has 'version' => (is=>'ro', required=>1);
+
+      sub time { return 'Mon Apr 11 10:49:42 2016' }
+    }
+
+    my $html_template = qq[
+      <html>
+        <head>
+          <title>Page Title</title>
+        </head>
+        <body>
+          <div id='version'>Version</div>
+          <div id='main'>Test Body</div>
+          <div id='foot'>Footer</div>
+        </body>
+      </html>
+    ];
+
+    my $pure = Local::Template::Pure::Custom->new(
+      version => 100,
+      template=>$html_template,
+      directives=> [
+        'title' => 'meta.title',
+        '#version' => 'self.version',
+        '#main' => 'story',
+        '#foot' => 'self.time',
+      ]
+    );
+
+Results in:
+
+    <html>
+      <head>
+        <title>A subclass</title>
+      </head>
+      <body>
+        <div id="version">100</div>
+        <div id="main">XXX</div>
+        <div id="foot">Mon Apr 11 10:49:42 2016</div>
+      </body>
+    </html>
+
+Creating subclasses of [Template::Pure](https://metacpan.org/pod/Template::Pure) to encapsulate some of the view
+data abd view logic should probably be considered a best practice approach.
+
+**NOTE** if you create a subclass and want your methods to have access to
+and to modify the DOM, you can return a CODEREF:
+
+    {
+      package Local::Template::Pure::Custom;
+
+      use Moo;
+      extends 'Template::Pure';
+
+      has 'version' => (is=>'ro', required=>1);
+
+      sub time {
+        return sub {
+        my ($self, $dom, $data) = @_;
+        $dom->attr(foo=>'bar');
+        return 'Mon Apr 11 10:49:42 2016';
+        };
+      }
+    }
 
 ## Remapping Your Data Context
 
