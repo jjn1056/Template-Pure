@@ -17,7 +17,7 @@ ok my $base_html = q[
     </head>
     <body>
       <div id='story'>Example Story</div>
-      <?pure-include src='foot' ctx='meta'?>
+      <?pure-include src='includes.foot' ctx='meta'?>
     </body>
   </html>
 ];
@@ -35,7 +35,9 @@ ok my $string = $base->render({
     author=>'jnap',
     time => scalar(localtime),
   },
-  foot => $foot,
+  includes => {
+    foot => $foot,
+  }
 });
 
 ok my $dom = DOM::Tiny->new($string);
