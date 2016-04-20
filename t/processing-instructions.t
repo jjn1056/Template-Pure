@@ -50,3 +50,18 @@ warn $string;
 
 done_testing;
 
+__END__
+
+output like
+
+  <html>
+    <head>
+      <title>Page Title: My Title</title>
+    </head>
+    <body>
+      <div id="story">Example Story</div>
+      
+  <span id="time">Wed Apr 20 15:48:12 2016</span>
+    </body>
+  </html>
+
