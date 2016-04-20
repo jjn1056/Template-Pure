@@ -1,5 +1,9 @@
 The following logs changes for the CPAN distribution Template::Pure
 
+0.014   19 April 2016
+        - Migration of DOM::Tiny to Mojo::DOM58.  This is just a namespace change
+          it does not add Mojolicious as a dependency to the application.
+
 0.013   11 April 2016
         - We now expose 'self', the current instance of the Pure object in your
           data context.  This makes it easier to follow the new best practice

@@ -3,7 +3,7 @@ use warnings;
 
 package Template::Pure;
 
-our $VERSION = '0.013';
+our $VERSION = '0.014';
 
 use DOM::Tiny;
 use Scalar::Util;
@@ -29,9 +29,33 @@ sub new {
 
 sub render {
   my ($self, $data_proto, $extra_directives) = @_;
-  my $dom = DOM::Tiny->new($self->{template});
-  
   $data_proto = Template::Pure::DataProxy->new($data_proto, self=>$self);
+  $extra_directives = [] unless $extra_directives;
+
+  my $dom = DOM::Tiny->new($self->{template});
+
+  my $nodes = $dom->child_nodes;
+  my $placeholder_cnt = 0;
+  my $do; $do = sub {
+    my ($item, $num) = @_;
+    if($item->type eq 'pi') {
+      my ($target, %attrs) = $self->parse_processing_instruction($item->tree->[1]);
+      if($target eq 'pure-include') {
+        $item->replace("<span id='include-$placeholder_cnt'>include placeholder</span>");
+        my @include_directives;
+        my $source_include = $data_proto->at($attrs{src});
+        if(my $ctx = $attrs{'ctx'}) {
+          @include_directives = ("#include-$placeholder_cnt" => +{ $ctx => ['^.' => '/'.$attrs{'src'}]});
+        } else {
+          @include_directives = ("^#include-$placeholder_cnt", $attrs{'src'})
+        }
+        push @{$extra_directives}, @include_directives;
+        $placeholder_cnt++;
+      }
+    }
+    $item->child_nodes->each($do);
+  };
+  $nodes->each($do);
 
   return $self->process_dom($dom, $data_proto, $extra_directives)->to_string;
 }
@@ -50,6 +74,7 @@ sub default_filters { Template::Pure::Filters->all }
 sub parse_match_spec { Template::Pure::ParseUtils::parse_match_spec($_[1]) }
 sub parse_data_spec { Template::Pure::ParseUtils::parse_data_spec($_[1]) }
 sub parse_data_template { Template::Pure::ParseUtils::parse_data_template($_[1]) }
+sub parse_processing_instruction { Template::Pure::ParseUtils::parse_processing_instruction($_[1]) }
 sub parse_itr_spec { Template::Pure::ParseUtils::parse_itr_spec($_[1]) } 
 sub escape_html { Template::Pure::Filters::escape_html($_[1]) }
 sub encoded_string { Template::Pure::EncodedString->new($_[1]) }
@@ -77,7 +102,7 @@ sub _process_dom_recursive {
 
   $self->{root_data} = $data_proto unless exists $self->{root_data};
 
-  my $data =  Template::Pure::DataContext->new($data_proto, $self->{root_data});
+  my $data = Template::Pure::DataContext->new($data_proto, $self->{root_data});
 
   ($data, @directives) = $self->_process_directive_instructions($dom, $data, @directives);
 

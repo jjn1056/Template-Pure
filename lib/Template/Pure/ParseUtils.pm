@@ -4,6 +4,19 @@ use strict;
 use warnings;
 use Scalar::Util ();
 
+sub parse_processing_instruction {
+  my ($pi) = @_;
+  my ($target, $body) = ($pi =~m/^\s*([^\s]+)(.+)$/s);
+  my %attrs = map {
+    my ($key, $val) = split '=', $_;
+    $val=~s/^['"]|['"]$//g; 
+    $key, $val;
+  } grep { $_ } 
+    split(/\s+/, $body);
+
+  return $target => %attrs;
+}
+
 sub parse_itr_spec {
   my ($spec) = @_;
   my ($key, $data_spec) = split('<-', $spec);
@@ -172,6 +185,26 @@ Contains utility functions for L<Template::Pure>
 =head1 FUNCTIONS
 
 This package contains the following functions:
+
+=head2 parse_processing_instruction ($pi)
+
+Given a processing instruction, parse it into a $target and %attrs such that:
+
+    <?pure-include id='ddd'
+      pure:mode='append|prepend|replace'
+      pure:target='node|content'
+      pure:src='include' ?>
+
+Is parsed into:
+
+    "pure-include" => {
+      id => "ddd",
+      "pure:mode" => "append|prepend|replace",
+      "pure:src" => "include",
+      "pure:target" => "node|content"
+    }
+
+and returned.
 
 =head2 parse_itr_spec ($spec)
 
