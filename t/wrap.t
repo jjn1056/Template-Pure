@@ -34,7 +34,7 @@ ok my $rendered_template = $to_wrap->render({
   meta => { title=>'My Title', author=>'jnap' },
 });
 
-ok my $dom = DOM::Tiny->new($rendered_template);
+ok my $dom = Mojo::DOM58->new($rendered_template);
 
 is $dom->at('title')->content, 'Page Title: My Title';
 is $dom->at('#foo span')->content, 'foo';

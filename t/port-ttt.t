@@ -148,7 +148,7 @@ ok my $out = $new_game->render(
   }
 );
 
-ok my $dom = DOM::Tiny->new($out);
+ok my $dom = Mojo::DOM58->new($out);
 
 is $dom->at('title')->content, 'New Game';
 is $dom->at('#moves')->content, 4;

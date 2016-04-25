@@ -1,6 +1,6 @@
 use Test::Most;
 use Template::Pure;
-use DOM::Tiny;
+use Mojo::DOM58;
 
 ok my $html = q[
   <html>
@@ -30,7 +30,7 @@ ok my $data = +{
 };
 
 ok my $string = $pure->render($data);
-ok my $dom = DOM::Tiny->new($string);
+ok my $dom = Mojo::DOM58->new($string);
 
 is $dom->at('#story ')->content, 'INNER STUFF: XXXXXXXXXXXXXXXXXXXX on 1/1/2020';
 is $dom->at('#footer')->content, 'Inner Stuff on 1/1/2020';

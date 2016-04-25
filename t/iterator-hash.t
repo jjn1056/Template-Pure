@@ -1,6 +1,6 @@
 use Test::Most;
 use Template::Pure;
-use DOM::Tiny;
+use Mojo::DOM58;
 
 
 ok my $html = qq[
@@ -37,7 +37,7 @@ ok my %data = (
 
 
 ok my $string = $pure->render(\%data);
-ok my $dom = DOM::Tiny->new($string);
+ok my $dom = Mojo::DOM58->new($string);
 
 is $dom->find('section')->[0]->at('dt')->content, 'first_name';
 is $dom->find('section')->[0]->at('dd')->content, 'John';

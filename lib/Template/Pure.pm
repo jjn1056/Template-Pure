@@ -5,7 +5,7 @@ package Template::Pure;
 
 our $VERSION = '0.014';
 
-use DOM::Tiny;
+use Mojo::DOM58;
 use Scalar::Util;
 use Template::Pure::ParseUtils;
 use Template::Pure::Filters;
@@ -32,7 +32,7 @@ sub render {
   $data_proto = Template::Pure::DataProxy->new($data_proto, self=>$self);
   $extra_directives = [] unless $extra_directives;
 
-  my $dom = DOM::Tiny->new($self->{template});
+  my $dom = Mojo::DOM58->new($self->{template});
 
   my $nodes = $dom->child_nodes;
   my $placeholder_cnt = 0;
@@ -43,13 +43,17 @@ sub render {
       if($target eq 'pure-include') {
         $item->replace("<span id='include-$placeholder_cnt'>include placeholder</span>");
         my @include_directives;
-        my $source_include = $data_proto->at($attrs{src});
         if(my $ctx = $attrs{'ctx'}) {
           @include_directives = ("#include-$placeholder_cnt" => +{ $ctx => ['^.' => '/'.$attrs{'src'}]});
         } else {
           @include_directives = ("^#include-$placeholder_cnt", $attrs{'src'})
         }
         push @{$extra_directives}, @include_directives;
+        $placeholder_cnt++;
+      } elsif($target eq 'pure-wrapper') {
+        $item->following('*')->first->attr('data-pure-wrapper-id'=>"wrapper-$placeholder_cnt");
+        $item->remove;
+        push @{$extra_directives}, ( "^*[data-pure-wrapper-id=wrapper-$placeholder_cnt]", $attrs{'src'});
         $placeholder_cnt++;
       }
     }
@@ -178,7 +182,7 @@ sub _process_obj {
         $self->_process_mode($_, $value, %match_spec);
       });
     }
-  } elsif($obj->isa('DOM::Tiny')) {
+  } elsif($obj->isa('Mojo::DOM58')) {
       $self->_process_match_spec($dom, $obj, %match_spec);
   } else {
     die "Can't process object of type $obj.";
@@ -335,7 +339,7 @@ sub _process_sub_data {
 
 sub _process_iterator {
   my ($self, $dom, $key, $iterator, @actions) = @_; 
-  my $new_dom = DOM::Tiny->new($dom);
+  my $new_dom = Mojo::DOM58->new($dom);
   while(my $datum = $iterator->next) {
     my $new_data = +{
       $key => $datum, 
@@ -372,7 +376,7 @@ sub _value_from_dom {
   if($match_spec{target} eq 'content') {
     #return $self->encoded_string($self->at_or_die($dom, $match_spec{css})->content);
     # Not sure if there is a more effecient way to make this happen...
-    return DOM::Tiny->new($self->at_or_die($dom, $match_spec{css})->content);
+    return Mojo::DOM58->new($self->at_or_die($dom, $match_spec{css})->content);
   } elsif($match_spec{target} eq 'node') {
     ## When we want a full node, with HTML tags, we encode the string
     ## since I presume they want a copy not escaped.  T 'think' this is
@@ -635,7 +639,7 @@ L<Template::Pure> has two required parameters:
 
 =item template
 
-This is a string that is an HTML template that can be parsed by L<DOM::Tiny>
+This is a string that is an HTML template that can be parsed by L<Mojo::DOM58>
 
 =item directives
 
@@ -667,8 +671,8 @@ always return to it, as you will later see in the L</DIRECTIVES> section.
 
 =item process_dom ($data, ?\@extra_directives?)
 
-Works just like 'render', except we return a L<DOM::Tiny> object instead of a string directly.
-Useful if you wish to retrieve the L<DOM::Tiny> object for advanced, custom tranformations.
+Works just like 'render', except we return a L<Mojo::DOM58> object instead of a string directly.
+Useful if you wish to retrieve the L<Mojo::DOM58> object for advanced, custom tranformations.
 
 =item data_at_path ($data, $path)
 
@@ -901,7 +905,7 @@ provide the matched value.  This anonymous subroutine receives the following thr
 arguments:
 
     $instance: The template instance
-    $dom: The DOM Node at the current match (as a L<DOM::Tiny> object).
+    $dom: The DOM Node at the current match (as a L<Mojo::DOM58> object).
     $data: Data reference at the current context.
 
 Your just need to return the value desired which will substitute for the matched node's
@@ -1545,10 +1549,10 @@ Results in:
       </body>
     </html>
 
-=head2 Object - A DOM::Tiny instance
+=head2 Object - A Mojo::DOM58 instance
 
 In the case where you set the value of the action target to an instance of
-L<DOM::Tiny>, we let the value of that perform the replacement indicated by
+L<Mojo::DOM58>, we let the value of that perform the replacement indicated by
 the match specification:
 
     my $html = q[
@@ -1565,7 +1569,7 @@ the match specification:
     my $pure = Template::Pure->new(
       template=>$html,
       directives=> [
-        'p' => DOM::Tiny->new("<a href='localhost:foo'>Foo!</a>"),
+        'p' => Mojo::DOM58->new("<a href='localhost:foo'>Foo!</a>"),
       ]);
 
     my $data = +{
@@ -1921,7 +1925,7 @@ not just the value.  Can be combined with '+' for append/prepend.
 
 =item '|': Run a filter on the current node
 
-Passed the currently selected node to a code reference.  You can run L<DOM::Tiny>
+Passed the currently selected node to a code reference.  You can run L<Mojo::DOM58>
 transforms on the entire selected node.  Nothing should be returned from this 
 coderef.
 
@@ -1989,7 +1993,7 @@ See L<Template::Pure::Filters> for all bundled filters.
 
 =head1 IMPORTANT NOTE REGARDING VALID HTML
 
-Please note that L<DOM::Tiny> tends to enforce rule regarding valid HTML5.  For example, you
+Please note that L<Mojo::DOM58> tends to enforce rule regarding valid HTML5.  For example, you
 cannot nest a block level element inside a 'P' element.  This might at time lead to some
 surprising results in your output.
 
@@ -1999,7 +2003,7 @@ John Napiorkowski L<email:jjnapiork@cpan.org>
   
 =head1 SEE ALSO
  
-L<DOM::Tiny>, L<HTML::Zoom>.  Both of these are approaches to programmatically examining and
+L<Mojo::DOM58, L<HTML::Zoom>.  Both of these are approaches to programmatically examining and
 altering a DOM.
 
 L<Template::Semantic> is a similar system that uses XPATH instead of a CSS inspired matching

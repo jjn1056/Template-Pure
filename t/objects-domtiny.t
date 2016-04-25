@@ -1,6 +1,6 @@
 use Test::Most;
 use Template::Pure;
-use DOM::Tiny;
+use Mojo::DOM58;
 
 ok my $html = q[
   <html>
@@ -17,7 +17,7 @@ ok my $html = q[
 ok my $pure = Template::Pure->new(
   template=>$html,
   directives=> [
-    'p' => DOM::Tiny->new("<a href='localhost:foo'>Foo!</a>"),
+    'p' => Mojo::DOM58->new("<a href='localhost:foo'>Foo!</a>"),
   ]);
 
 ok my $data = +{
@@ -25,7 +25,7 @@ ok my $data = +{
 };
 
 ok my $string = $pure->render($data);
-ok my $dom = DOM::Tiny->new($string);
+ok my $dom = Mojo::DOM58->new($string);
 
 is $dom->find('p')->[0]->content, '<a href="localhost:foo">Foo!</a>';
 is $dom->find('p')->[1]->content, '<a href="localhost:foo">Foo!</a>';

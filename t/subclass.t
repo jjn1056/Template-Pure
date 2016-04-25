@@ -56,7 +56,7 @@ ok my $data = +{
 };
 
 ok my $string = $pure->render($data);
-ok my $dom = DOM::Tiny->new($string);
+ok my $dom = Mojo::DOM58->new($string);
 
 is $dom->at('title'), '<title>A subclass</title>';
 is $dom->at('#version')->content, '100';

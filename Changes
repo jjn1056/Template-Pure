@@ -1,8 +1,11 @@
 The following logs changes for the CPAN distribution Template::Pure
 
 0.014   19 April 2016
-        - Migration of DOM::Tiny to Mojo::DOM58.  This is just a namespace change
-          it does not add Mojolicious as a dependency to the application.
+        - Migration of Mojo::DOM58 to Mojo::DOM58.  This is just a namespace change
+          it does not add Mojolicious as a dependency to the application.  This
+          could also be a breaking change for you if you are hardcoding instances
+          of Mojo::DOM58.  Should be a simple search and replace job.  I did warn you
+          this is experimental code right :)
 
 0.013   11 April 2016
         - We now expose 'self', the current instance of the Pure object in your
@@ -14,8 +17,8 @@ The following logs changes for the CPAN distribution Template::Pure
           if you did not follow the recommended best practice.
 
 0.012   25 March 2016
-        - Require the newest version of DOM::Tiny
-        - You may now set the target of an action to a DOM::Tiny object instance.
+        - Require the newest version of Mojo::DOM58
+        - You may now set the target of an action to a Mojo::DOM58 object instance.
 
 0.011   22 March 2016
         - Now if the result of a scalar action is an object that does 'TO_HTML' we

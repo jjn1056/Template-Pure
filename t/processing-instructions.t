@@ -1,6 +1,17 @@
 use Test::Most;
 use Template::Pure;
 
+ok my $story_html = qq[
+  <section>
+    <h1>story title</h1>
+  </section>];
+
+ok my $story = Template::Pure->new(
+  template=>$story_html,
+  directives=> [
+    '^h1+' => 'content',
+  ]);
+
 ok my $foot_html = qq[
   <span id="time">current time</span>];
 
@@ -16,6 +27,7 @@ ok my $base_html = q[
       <title>Page Title: </title>
     </head>
     <body>
+      <?pure-wrapper src='includes.story'?>
       <div id='story'>Example Story</div>
       <?pure-include src='includes.foot' ctx='meta'?>
     </body>
@@ -26,6 +38,7 @@ ok my $base = Template::Pure->new(
   template=>$base_html,
   directives=> [
     'title+' => 'meta.title',
+    '#story' => sub { 'XXX'x10 },
   ]
 );
 
@@ -37,10 +50,11 @@ ok my $string = $base->render({
   },
   includes => {
     foot => $foot,
+    story => $story,
   }
 });
 
-ok my $dom = DOM::Tiny->new($string);
+ok my $dom = Mojo::DOM58->new($string);
 
 #is $dom->at('title')->content, 'Page Title: My Title';
 #is $dom->at('#foo span')->content, 'foo';

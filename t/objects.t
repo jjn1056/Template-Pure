@@ -1,6 +1,6 @@
 use Test::Most;
 use Template::Pure;
-use DOM::Tiny;
+use Mojo::DOM58;
 
 {
   package Local::Example;
@@ -39,7 +39,7 @@ ok my $data = +{
 };
 
 ok my $string = $pure->render($data);
-ok my $dom = DOM::Tiny->new($string);
+ok my $dom = Mojo::DOM58->new($string);
 
 is $dom->find('p')->[0]->content, 'foo';
 is $dom->find('p')->[1]->content, 'bar';

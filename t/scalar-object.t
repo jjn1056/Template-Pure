@@ -1,6 +1,6 @@
 use Test::Most;
 use Template::Pure;
-use DOM::Tiny;
+use Mojo::DOM58;
 
 ok my $wrapper_html = qq[
   <section>Example Wrapped Stuff</section>];
@@ -37,7 +37,7 @@ ok my $data = +{
 };
 
 ok my $string = $pure->render($data);
-ok my $dom = DOM::Tiny->new($string);
+ok my $dom = Mojo::DOM58->new($string);
 
 is $dom->at('body section p')->content, 'Hi Di Ho!';
 is $dom->at('title')->content, 'SCALAR OBJECTS';

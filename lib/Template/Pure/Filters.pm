@@ -45,7 +45,7 @@ sub escape_html {
   if(
     Scalar::Util::blessed($value) && ( 
       $value->isa('Template::Pure::EncodedString') ||
-      $value->isa('DOM::Tiny')
+      $value->isa('Mojo::DOM58')
     )
   ) {
     return $value;

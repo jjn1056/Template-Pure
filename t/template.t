@@ -1,6 +1,6 @@
 use Test::Most;
 use Template::Pure;
-use DOM::Tiny;
+use Mojo::DOM58;
 
 ok my $inner_html = q[
   <h1>Header</h1>
@@ -62,7 +62,7 @@ ok my $data = +{
 };
 
 ok my $string = $pure->render($data);
-ok my $dom = DOM::Tiny->new($string);
+ok my $dom = Mojo::DOM58->new($string);
 
 is $dom->at('body section#content p#story ')->content, 'XXXXXXXXXXXXXXXXXXXX';
 is $dom->at('body h1')->content, 'Inner Stuff';

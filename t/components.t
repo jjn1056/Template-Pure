@@ -72,11 +72,9 @@ ok my $html_template = qq[
     <head>
       <title>Page Title: </title>
     </head>
-    <?pure-wrapper src='wrapper.html' mode="append|prepend|replace" target="node|content" ctx="meta" ?>
     <body>
       <p>Time in NYC: <pure-localtime id='time_nyc' tz='America/New_York'/></p>
       <p>Time in Chicago: <pure-localtime id='time_chi' tz='America/Chicago' /></p>
-      <?pure-include src='={base}/footer.html' ctx='meta.info' ?>
     </body>
   </html>
 ];
@@ -98,7 +96,7 @@ ok my %data = (
 );
 
 ok my $string = $pure->render(\%data);
-ok my $dom = DOM::Tiny->new($string);
+ok my $dom = Mojo::DOM58->new($string);
 
 warn $string;
 

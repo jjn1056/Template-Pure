@@ -1,6 +1,6 @@
 use Test::Most;
 use Template::Pure;
-use DOM::Tiny;
+use Mojo::DOM58;
 
 ok my $html = q[
   <html>
@@ -54,7 +54,7 @@ ok my $data = +{
 };
 
 ok my $string = $pure->render($data);
-ok my $dom = DOM::Tiny->new($string);
+ok my $dom = Mojo::DOM58->new($string);
 
 is $dom->find('ul li')->[0]->content, '<span>john</span>extra stuff';
 is $dom->find('ul li')->[1]->content, '<span>jack</span>extra stuff';

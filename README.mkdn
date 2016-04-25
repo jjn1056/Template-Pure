@@ -135,7 +135,7 @@ The first step is to create a [Template::Pure](https://metacpan.org/pod/Template
 
 - template
 
-    This is a string that is an HTML template that can be parsed by [DOM::Tiny](https://metacpan.org/pod/DOM::Tiny)
+    This is a string that is an HTML template that can be parsed by [Mojo::DOM58](https://metacpan.org/pod/Mojo::DOM58)
 
 - directives
 
@@ -163,8 +163,8 @@ Once you have a created object, you may call the following methods:
 
 - process\_dom ($data, ?\\@extra\_directives?)
 
-    Works just like 'render', except we return a [DOM::Tiny](https://metacpan.org/pod/DOM::Tiny) object instead of a string directly.
-    Useful if you wish to retrieve the [DOM::Tiny](https://metacpan.org/pod/DOM::Tiny) object for advanced, custom tranformations.
+    Works just like 'render', except we return a [Mojo::DOM58](https://metacpan.org/pod/Mojo::DOM58) object instead of a string directly.
+    Useful if you wish to retrieve the [Mojo::DOM58](https://metacpan.org/pod/Mojo::DOM58) object for advanced, custom tranformations.
 
 - data\_at\_path ($data, $path)
 
@@ -393,7 +393,7 @@ provide the matched value.  This anonymous subroutine receives the following thr
 arguments:
 
     $instance: The template instance
-    $dom: The DOM Node at the current match (as a L<DOM::Tiny> object).
+    $dom: The DOM Node at the current match (as a L<Mojo::DOM58> object).
     $data: Data reference at the current context.
 
 Your just need to return the value desired which will substitute for the matched node's
@@ -1029,10 +1029,10 @@ Results in:
       </body>
     </html>
 
-## Object - A DOM::Tiny instance
+## Object - A Mojo::DOM58 instance
 
 In the case where you set the value of the action target to an instance of
-[DOM::Tiny](https://metacpan.org/pod/DOM::Tiny), we let the value of that perform the replacement indicated by
+[Mojo::DOM58](https://metacpan.org/pod/Mojo::DOM58), we let the value of that perform the replacement indicated by
 the match specification:
 
     my $html = q[
@@ -1049,7 +1049,7 @@ the match specification:
     my $pure = Template::Pure->new(
       template=>$html,
       directives=> [
-        'p' => DOM::Tiny->new("<a href='localhost:foo'>Foo!</a>"),
+        'p' => Mojo::DOM58->new("<a href='localhost:foo'>Foo!</a>"),
       ]);
 
     my $data = +{
@@ -1403,7 +1403,7 @@ for needs unique to the needs of templating:
 
 - '|': Run a filter on the current node
 
-    Passed the currently selected node to a code reference.  You can run [DOM::Tiny](https://metacpan.org/pod/DOM::Tiny)
+    Passed the currently selected node to a code reference.  You can run [Mojo::DOM58](https://metacpan.org/pod/Mojo::DOM58)
     transforms on the entire selected node.  Nothing should be returned from this 
     coderef.
 
@@ -1469,7 +1469,7 @@ See [Template::Pure::Filters](https://metacpan.org/pod/Template::Pure::Filters) 
 
 # IMPORTANT NOTE REGARDING VALID HTML
 
-Please note that [DOM::Tiny](https://metacpan.org/pod/DOM::Tiny) tends to enforce rule regarding valid HTML5.  For example, you
+Please note that [Mojo::DOM58](https://metacpan.org/pod/Mojo::DOM58) tends to enforce rule regarding valid HTML5.  For example, you
 cannot nest a block level element inside a 'P' element.  This might at time lead to some
 surprising results in your output.
 
@@ -1479,8 +1479,8 @@ John Napiorkowski [email:jjnapiork@cpan.org](email:jjnapiork@cpan.org)
 
 # SEE ALSO
 
-[DOM::Tiny](https://metacpan.org/pod/DOM::Tiny), [HTML::Zoom](https://metacpan.org/pod/HTML::Zoom).  Both of these are approaches to programmatically examining and
-altering a DOM.
+["Mojo::DOM58, [HTML::Zoom](https://metacpan.org/pod/HTML::Zoom).  Both of these are approaches to programmatically examining and
+altering a DOM."](#mojo-dom58-html-zoom-both-of-these-are-approaches-to-programmatically-examining-and-altering-a-dom)
 
 [Template::Semantic](https://metacpan.org/pod/Template::Semantic) is a similar system that uses XPATH instead of a CSS inspired matching
 specification.  It has more dependencies (including [XML::LibXML](https://metacpan.org/pod/XML::LibXML) and doesn't separate the actual
@@ -1493,3 +1493,11 @@ Copyright 2016, John Napiorkowski [email:jjnapiork@cpan.org](email:jjnapiork@cpa
 
 This library is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.
+
+# POD ERRORS
+
+Hey! **The above document had some coding errors, which are explained below:**
+
+- Around line 2004:
+
+    Unterminated L<...> sequence
