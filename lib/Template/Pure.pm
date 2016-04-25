@@ -64,6 +64,15 @@ sub render {
           );
         }
         $placeholder_cnt++;
+      } elsif($target eq 'pure-master') {
+        my $src =  $attrs{src};
+        $item->following('*')->first->attr('data-pure-master-id'=>"master-$placeholder_cnt");
+        $item->remove;
+        push @{$extra_directives}, (
+          "^*[data-pure-master-id=master-$placeholder_cnt]", [\%attrs, '^.' => 'src'],
+          "*[data-pure-master-id=master-$placeholder_cnt]\@data-pure-master-id", sub { undef },
+        );
+        $placeholder_cnt++;
       }
     }
     $item->child_nodes->each($do);

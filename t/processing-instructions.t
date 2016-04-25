@@ -1,6 +1,31 @@
 use Test::Most;
 use Template::Pure;
 
+ok my $master_html = q[
+  <html>
+    <head>
+      <title>Example Title</title>
+      <link rel="stylesheet" href="/css/pure-min.css"/>
+        <link rel="stylesheet" href="/css/grids-responsive-min.css"/>
+          <link rel="stylesheet" href="/css/common.css"/>
+      <script src="/js/3rd-party/angular.min.js"></script>
+        <script src="/js/3rd-party/angular.resource.min.js"></script>
+    </head>
+    <body>
+      <section id="content">...</section>
+      <p id="foot">Here's the footer</p>
+    </body>
+  </html>
+];
+
+ok my $master = Template::Pure->new(
+  template=>$master_html,
+  directives=> [
+    'title' => 'title',
+    'head+' => 'scripts',
+    'body section#content' => 'content',
+  ]);
+
 ok my $story_html = qq[
   <section>
     <h1>story title</h1>
@@ -24,9 +49,18 @@ ok my $foot = Template::Pure->new(
   ]);
 
 ok my $base_html = q[
+  <?pure-master src='lib.master'
+    title=\'title'
+    scripts=\'^head script' 
+    content=\'body'?>
   <html>
     <head>
       <title>Page Title: </title>
+      <script>
+      function foo(bar) {
+        return baz;
+      }
+      </script>
     </head>
     <body>
       <?pure-wrapper src='lib.story' ctx='meta'?>
@@ -53,6 +87,7 @@ ok my $string = $base->render({
   lib => {
     foot => $foot,
     story => $story,
+    master => $master,
   }
 });
 

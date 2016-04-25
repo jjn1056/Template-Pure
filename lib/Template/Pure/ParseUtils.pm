@@ -9,11 +9,19 @@ sub parse_processing_instruction {
   my ($target, $body) = ($pi =~m/^\s*([^\s]+)(.+)$/s);
   my %attrs = map {
     my ($key, $val) = split '=', $_;
-    $val=~s/^['"]|['"]$//g; 
-    $key, $val;
+    $key=~s/^\s+//g;
+    if($val=~s/^\\//) {
+      $val=~s/^['"]|['"]$//g; 
+      my $val2 = \$val;
+      $key, $val2;
+    } else {
+      $val=~s/^['"]|['"]$//g;
+      $key, $val;
+    }
   } grep { $_ } 
-    split(/\s+/, $body);
-
+    split(/['"]\s+/, $body);
+  use Devel::Dwarn;
+  Dwarn \%attrs;
   return $target => %attrs;
 }
 
