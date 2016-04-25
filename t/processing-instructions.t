@@ -4,12 +4,14 @@ use Template::Pure;
 ok my $story_html = qq[
   <section>
     <h1>story title</h1>
+    <p>By </p>
   </section>];
 
 ok my $story = Template::Pure->new(
   template=>$story_html,
   directives=> [
-    '^h1+' => 'content',
+    '^p+' => 'content',
+    'p+' => 'author',
   ]);
 
 ok my $foot_html = qq[
@@ -27,9 +29,9 @@ ok my $base_html = q[
       <title>Page Title: </title>
     </head>
     <body>
-      <?pure-wrapper src='includes.story'?>
+      <?pure-wrapper src='lib.story' ctx='meta'?>
       <div id='story'>Example Story</div>
-      <?pure-include src='includes.foot' ctx='meta'?>
+      <?pure-include src='lib.foot' ctx='meta'?>
     </body>
   </html>
 ];
@@ -48,7 +50,7 @@ ok my $string = $base->render({
     author=>'jnap',
     time => scalar(localtime),
   },
-  includes => {
+  lib => {
     foot => $foot,
     story => $story,
   }
@@ -66,7 +68,7 @@ done_testing;
 
 __END__
 
-output like
+output like:
 
   <html>
     <head>
@@ -75,10 +77,11 @@ output like
     <body> 
       <section>
         <h1>story title</h1>
+        <p>By jnap</p>
         <div id="story">
           XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
         </div>
-      </section>  
-      <span id="time">Mon Apr 25 09:29:45 2016</span>
+      </section>
+      <span id="time">Mon Apr 25 10:33:19 2016</span>
     </body>
   </html>

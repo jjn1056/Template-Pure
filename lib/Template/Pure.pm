@@ -53,10 +53,16 @@ sub render {
       } elsif($target eq 'pure-wrapper') {
         $item->following('*')->first->attr('data-pure-wrapper-id'=>"wrapper-$placeholder_cnt");
         $item->remove;
-        push @{$extra_directives}, (
-          "^*[data-pure-wrapper-id=wrapper-$placeholder_cnt]", $attrs{'src'},
-          "*[data-pure-wrapper-id=wrapper-$placeholder_cnt]\@data-pure-wrapper-id", sub { undef },
-        );
+        if(my $ctx = $attrs{'ctx'}) {
+          push @{$extra_directives}, (
+            "^*[data-pure-wrapper-id=wrapper-$placeholder_cnt]", +{ $ctx => ['^.' => '/'.$attrs{'src'}]},
+            "*[data-pure-wrapper-id=wrapper-$placeholder_cnt]\@data-pure-wrapper-id", sub { undef },
+          );        } else {
+          push @{$extra_directives}, (
+            "^*[data-pure-wrapper-id=wrapper-$placeholder_cnt]", $attrs{'src'},
+            "*[data-pure-wrapper-id=wrapper-$placeholder_cnt]\@data-pure-wrapper-id", sub { undef },
+          );
+        }
         $placeholder_cnt++;
       }
     }
