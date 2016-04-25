@@ -456,10 +456,13 @@ sub _process_mode {
 
   ## This behavior may be tweaked in the future.
   if($self->_value_is_undef($safe_value)) {
-    if(my $attr = $$target) {
-      return delete $dom->attr->{$attr};
-    } else {
+    if($target eq 'node') {
       return $dom->remove;
+    } elsif($target eq 'content') {
+      return $dom->remove; # TODO, or should this remove just the content..?
+    } elsif(my $attr = $$target) {
+      return delete $dom->attr->{$attr};
+
     }
   }
 

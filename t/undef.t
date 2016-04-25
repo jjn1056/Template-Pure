@@ -43,6 +43,8 @@ ok my $data = +{
 ok my $string = $pure->render($data);
 ok my $dom = Mojo::DOM58->new($string);
 
+#warn $string;
+
 ok !$dom->at('title');
 ok !$dom->at('ol li');
 ok !$dom->at('body div');

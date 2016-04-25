@@ -110,21 +110,3 @@ __END__
     return $class;
   }
 
-
-  <html>
-    <head>
-      <title>Page Title: </title>
-    </head>
-    <body>
-      <p>
-        <?pure-include src="={base}/body.html"?>
-      </p>
-    </body>
-  </html>
-
-
-  'span#include1" => sub {
-      my ($t, $dom, $data) = @_;
-      return GET '';
-      
-  }
