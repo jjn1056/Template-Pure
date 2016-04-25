@@ -72,10 +72,13 @@ output like
     <head>
       <title>Page Title: My Title</title>
     </head>
-    <body>
-      <div id="story">Example Story</div>
-      
-  <span id="time">Wed Apr 20 15:48:12 2016</span>
+    <body> 
+      <section>
+        <h1>story title</h1>
+        <div id="story">
+          XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+        </div>
+      </section>  
+      <span id="time">Mon Apr 25 09:29:45 2016</span>
     </body>
   </html>
-

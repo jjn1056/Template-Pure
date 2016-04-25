@@ -53,7 +53,10 @@ sub render {
       } elsif($target eq 'pure-wrapper') {
         $item->following('*')->first->attr('data-pure-wrapper-id'=>"wrapper-$placeholder_cnt");
         $item->remove;
-        push @{$extra_directives}, ( "^*[data-pure-wrapper-id=wrapper-$placeholder_cnt]", $attrs{'src'});
+        push @{$extra_directives}, (
+          "^*[data-pure-wrapper-id=wrapper-$placeholder_cnt]", $attrs{'src'},
+          "*[data-pure-wrapper-id=wrapper-$placeholder_cnt]\@data-pure-wrapper-id", sub { undef },
+        );
         $placeholder_cnt++;
       }
     }
@@ -446,7 +449,13 @@ sub _process_mode {
   my $safe_value = $self->escape_html($value);
 
   ## This behavior may be tweaked in the future.
-  return $dom->remove if $self->_value_is_undef($safe_value);
+  if($self->_value_is_undef($safe_value)) {
+    if(my $attr = $$target) {
+      return delete $dom->attr->{$attr};
+    } else {
+      return $dom->remove;
+    }
+  }
 
   if($mode eq 'replace') {
     if($target eq 'content') {
