@@ -108,15 +108,28 @@ output like:
   <html>
     <head>
       <title>Page Title: My Title</title>
-    </head>
-    <body> 
-      <section>
-        <h1>story title</h1>
-        <p>By jnap</p>
-        <div id="story">
-          XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-        </div>
+      <link href="/css/pure-min.css" rel="stylesheet">
+        <link href="/css/grids-responsive-min.css" rel="stylesheet">
+          <link href="/css/common.css" rel="stylesheet">
+      <script src="/js/3rd-party/angular.min.js"></script>
+        <script src="/js/3rd-party/angular.resource.min.js"></script>
+          <script>
+            function foo(bar) {
+              return baz;
+            }
+          </script>
+      </head>
+    <body>
+      <section id="content"> 
+        <section>
+          <h1>story title</h1>
+          <p>By jnap</p>
+          <div id="story">
+            XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+          </div>
+        </section>
+        <span id="time">Mon Apr 25 16:49:55 2016</span>
       </section>
-      <span id="time">Mon Apr 25 10:33:19 2016</span>
+      <p id="foot">Here&#39;s the footer</p>
     </body>
   </html>
