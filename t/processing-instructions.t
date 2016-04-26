@@ -35,6 +35,7 @@ ok my $story_html = qq[
 ok my $story = Template::Pure->new(
   template=>$story_html,
   directives=> [
+    'h1' => 'title',
     '^p+' => 'content',
     'p+' => 'author',
   ]);
@@ -93,11 +94,16 @@ ok my $string = $base->render({
 
 ok my $dom = Mojo::DOM58->new($string);
 
-#is $dom->at('title')->content, 'Page Title: My Title';
-#is $dom->at('#foo span')->content, 'foo';
-#is $dom->at('#bar span')->content, 'bar';
-
-warn $string;
+is $dom->at('title')->content, 'Page Title: My Title';
+is $dom->at('section #story')->content, 'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX';
+is $dom->at('section p')->content, 'By jnap';
+is $dom->at('section h1')->content, 'My Title';
+ok $dom->at('#time')->content;
+is $dom->at('#foot')->content, 'Here&#39;s the footer';
+is $dom->find('link')->[0]->attr('href'), '/css/pure-min.css';
+is $dom->find('script')->[0]->attr('src'), '/js/3rd-party/angular.min.js';
+like $dom->find('script')->[2]->content, qr'function';
+like $dom->find('script')->[2]->content, qr'return baz';
 
 done_testing;
 
