@@ -1,7 +1,7 @@
 use Test::Most;
 use Template::Pure;
 
-ok my $master_html = q[
+ok my $overlay_html = q[
   <html>
     <head>
       <title>Example Title</title>
@@ -18,8 +18,8 @@ ok my $master_html = q[
   </html>
 ];
 
-ok my $master = Template::Pure->new(
-  template=>$master_html,
+ok my $overlay = Template::Pure->new(
+  template=>$overlay_html,
   directives=> [
     'title' => 'title',
     'head+' => 'scripts',
@@ -49,7 +49,7 @@ ok my $foot = Template::Pure->new(
   ]);
 
 ok my $base_html = q[
-  <?pure-master src='lib.master'
+  <?pure-overlay src='lib.overlay'
     title=\'title'
     scripts=\'^head script' 
     content=\'body'?>
@@ -87,7 +87,7 @@ ok my $string = $base->render({
   lib => {
     foot => $foot,
     story => $story,
-    master => $master,
+    overlay => $overlay,
   }
 });
 

@@ -13,6 +13,7 @@ use Template::Pure::DataContext;
 use Template::Pure::DataProxy;
 use Template::Pure::EncodedString;
 use Template::Pure::Iterator;
+use Storable qw(dclone);
 
 sub new {
   my ($proto, %args) = @_;
@@ -20,26 +21,27 @@ sub new {
 
   die '"template" is required' unless $args{template};
 
+  my ($dom, @directives)  = $class->_prepare_dom($args{template});  
+  unshift @directives, @{$args{directives}};
+
   return bless +{
     filters => $args{filters} || +{},
-    template => $args{template},
-    directives => $args{directives},
+    directives => \@directives,
+    dom => $dom, 
   }, $class;
 }
 
-sub render {
-  my ($self, $data_proto, $extra_directives) = @_;
-  $data_proto = Template::Pure::DataProxy->new($data_proto, self=>$self);
-  $extra_directives = [] unless $extra_directives;
-
-  my $dom = Mojo::DOM58->new($self->{template});
+sub _prepare_dom {
+  my ($class, $template) = @_;
+  my @directives = ();
+  my $dom = Mojo::DOM58->new($template);
 
   my $nodes = $dom->child_nodes;
   my $placeholder_cnt = 0;
   my $do; $do = sub {
     my ($item, $num) = @_;
     if($item->type eq 'pi') {
-      my ($target, %attrs) = $self->parse_processing_instruction($item->tree->[1]);
+      my ($target, %attrs) = $class->parse_processing_instruction($item->tree->[1]);
       if($target eq 'pure-include') {
         $item->replace("<span id='include-$placeholder_cnt'>include placeholder</span>");
         my @include_directives;
@@ -48,29 +50,29 @@ sub render {
         } else {
           @include_directives = ("^#include-$placeholder_cnt", $attrs{'src'})
         }
-        push @{$extra_directives}, @include_directives;
+        push @directives, @include_directives;
         $placeholder_cnt++;
       } elsif($target eq 'pure-wrapper') {
         $item->following('*')->first->attr('data-pure-wrapper-id'=>"wrapper-$placeholder_cnt");
         $item->remove;
         if(my $ctx = $attrs{'ctx'}) {
-          push @{$extra_directives}, (
+          push @directives, (
             "^*[data-pure-wrapper-id=wrapper-$placeholder_cnt]", +{ $ctx => ['^.' => '/'.$attrs{'src'}]},
             "*[data-pure-wrapper-id=wrapper-$placeholder_cnt]\@data-pure-wrapper-id", sub { undef },
           );        } else {
-          push @{$extra_directives}, (
+          push @directives, (
             "^*[data-pure-wrapper-id=wrapper-$placeholder_cnt]", $attrs{'src'},
             "*[data-pure-wrapper-id=wrapper-$placeholder_cnt]\@data-pure-wrapper-id", sub { undef },
           );
         }
         $placeholder_cnt++;
-      } elsif($target eq 'pure-master') {
+      } elsif($target eq 'pure-overlay') {
         my $src =  $attrs{src};
-        $item->following('*')->first->attr('data-pure-master-id'=>"master-$placeholder_cnt");
+        $item->following('*')->first->attr('data-pure-overlay-id'=>"overlay-$placeholder_cnt");
         $item->remove;
-        push @{$extra_directives}, (
-          "^*[data-pure-master-id=master-$placeholder_cnt]", [\%attrs, '^.' => 'src'],
-          "*[data-pure-master-id=master-$placeholder_cnt]\@data-pure-master-id", sub { undef },
+        push @directives, (
+          "^*[data-pure-overlay-id=overlay-$placeholder_cnt]", [\%attrs, '^.' => 'src'],
+          "*[data-pure-overlay-id=overlay-$placeholder_cnt]\@data-pure-overlay-id", sub { undef },
         );
         $placeholder_cnt++;
       }
@@ -79,6 +81,18 @@ sub render {
   };
   $nodes->each($do);
 
+  return ($dom, @directives);
+}
+
+sub clone_dom { return dclone(shift->{dom}) }
+
+sub render {
+  my ($self, $data_proto, $extra_directives) = @_;
+  $data_proto = Template::Pure::DataProxy->new($data_proto, self=>$self);
+  $extra_directives = [] unless $extra_directives;
+
+  my $dom = $self->clone_dom;
+  
   return $self->process_dom($dom, $data_proto, $extra_directives)->to_string;
 }
 
@@ -1486,7 +1500,7 @@ Results in:
 Lastly you can mimic a type of inheritance using data mapping and
 node aliasing:
 
-   my $master_html = q[
+   my $overlay_html = q[
       <html>
         <head>
           <title>Example Title</title>
@@ -1503,8 +1517,8 @@ node aliasing:
       </html>
     ];
 
-    my $master = Template::Pure->new(
-      template=>$master_html,
+    my $overlay = Template::Pure->new(
+      template=>$overlay_html,
       directives=> [
         'title' => 'title',
         '^title+' => 'scripts',
@@ -1540,7 +1554,7 @@ node aliasing:
             scripts => \'^head script',
             content => \'body',
           },
-          '^.' => $master,
+          '^.' => $overlay,
         ]
       ]);
 

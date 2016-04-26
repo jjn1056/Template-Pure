@@ -7,6 +7,10 @@ The following logs changes for the CPAN distribution Template::Pure
           of Mojo::DOM58.  Should be a simple search and replace job.  I did warn you
           this is experimental code right :)
         - Fixed a bug where you could not delete an attribute by setting it to undef.
+        - New Feature: Template processing instructions.  Lets the template author
+          embed processing instructions into the HTML so that she can have easier control
+          over the template structure without needing to learn Perl and the Template::Pure
+          API.  
 
 0.013   11 April 2016
         - We now expose 'self', the current instance of the Pure object in your

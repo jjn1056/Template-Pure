@@ -72,7 +72,7 @@ ok my $pure = Template::Pure->new(
   ]
 );
 
-ok $pure->{template};
+ok $pure->{dom};
 ok $pure->{directives};
 ok $pure->{filters};
 
