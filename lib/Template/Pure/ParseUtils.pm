@@ -20,8 +20,6 @@ sub parse_processing_instruction {
     }
   } grep { $_ } 
     split(/['"]\s+/, $body);
-  use Devel::Dwarn;
-  Dwarn \%attrs;
   return $target => %attrs;
 }
 

@@ -42,40 +42,50 @@ sub _prepare_dom {
     my ($item, $num) = @_;
     if($item->type eq 'pi') {
       my ($target, %attrs) = $class->parse_processing_instruction($item->tree->[1]);
+      my $ctx = delete $attrs{ctx};
+      my $src = delete $attrs{src};
+
       if($target eq 'pure-include') {
         $item->replace("<span id='include-$placeholder_cnt'>include placeholder</span>");
         my @include_directives;
-        if(my $ctx = $attrs{'ctx'}) {
-          @include_directives = ("#include-$placeholder_cnt" => +{ $ctx => ['^.' => '/'.$attrs{'src'}]});
-        } else {
-          @include_directives = ("^#include-$placeholder_cnt", $attrs{'src'})
+        if($ctx) {
+          @include_directives = ("#include-$placeholder_cnt" => +{ $ctx => ['^.' => "/$src"]});
+        } elsif(%attrs) {
+          @include_directives = ("#include-$placeholder_cnt" => [\%attrs, '^.' => "/$src"]);
+        }else {
+          @include_directives = ("^#include-$placeholder_cnt", $src)
         }
         push @directives, @include_directives;
-        $placeholder_cnt++;
       } elsif($target eq 'pure-wrapper') {
         $item->following('*')->first->attr('data-pure-wrapper-id'=>"wrapper-$placeholder_cnt");
         $item->remove;
-        if(my $ctx = $attrs{'ctx'}) {
+        if($ctx) {
           push @directives, (
-            "^*[data-pure-wrapper-id=wrapper-$placeholder_cnt]", +{ $ctx => ['^.' => '/'.$attrs{'src'}]},
+            "^*[data-pure-wrapper-id=wrapper-$placeholder_cnt]", +{ $ctx => ['^.' => "/$src"]},
             "*[data-pure-wrapper-id=wrapper-$placeholder_cnt]\@data-pure-wrapper-id", sub { undef },
-          );        } else {
+          );
+        } elsif(%attrs) {
           push @directives, (
-            "^*[data-pure-wrapper-id=wrapper-$placeholder_cnt]", $attrs{'src'},
+            "^*[data-pure-wrapper-id=wrapper-$placeholder_cnt]", [\%attrs, '^.' => "/$src"],
+            "*[data-pure-wrapper-id=wrapper-$placeholder_cnt]\@data-pure-wrapper-id", sub { undef },
+          );
+        }else {
+          push @directives, (
+            "^*[data-pure-wrapper-id=wrapper-$placeholder_cnt]", $src,
             "*[data-pure-wrapper-id=wrapper-$placeholder_cnt]\@data-pure-wrapper-id", sub { undef },
           );
         }
-        $placeholder_cnt++;
       } elsif($target eq 'pure-overlay') {
-        my $src =  $attrs{src};
         $item->following('*')->first->attr('data-pure-overlay-id'=>"overlay-$placeholder_cnt");
         $item->remove;
         push @directives, (
-          "^*[data-pure-overlay-id=overlay-$placeholder_cnt]", [\%attrs, '^.' => 'src'],
+          "^*[data-pure-overlay-id=overlay-$placeholder_cnt]", [ +{%attrs, src=>$src }, '^.' => 'src'],
           "*[data-pure-overlay-id=overlay-$placeholder_cnt]\@data-pure-overlay-id", sub { undef },
         );
-        $placeholder_cnt++;
+      } else {
+        warn "Encountering processing instruction $target that I can't process";
       }
+      $placeholder_cnt++;
     }
     $item->child_nodes->each($do);
   };
@@ -543,7 +553,7 @@ sub filter {
 
 =head1 NAME
 
-Template::Pure - Perlish Port of pure.js
+Template::Pure - Perlish Port of pure.js and more
 
 =head1 SYNOPSIS
 
@@ -1690,6 +1700,8 @@ Results in:
       </body>
     </html>
 
+B<NOTE> For an alternative method see L</PROCESSING INSTRUCTIONS>
+
 =head2 Using Dot Notation in Directive Data Mapping
 
 L<Template::Pure> allows you to indicate a path to a point in your
@@ -2031,6 +2043,389 @@ which should make it easier for you to give the job of writing directives / acti
 to non programmers.
 
 See L<Template::Pure::Filters> for all bundled filters.
+
+=head1 PROCESSING INSTRUCTIONS
+
+Generally L<Template::Pure> proposes its best to keep your actual HTML templates as simple
+and valid as possible, instead putting your transformations and data binding logic into
+directives.  This leads to a strong separate of responsibilities and prevents your templates
+from getting messy.  However there are a few situations where we'd like to offer the template
+designer some options to control the overall template structure and to encapsulate common
+design elements or template rules.  For example its common in a website to have some common
+layouts that set overall page structure and import common CSS and Javascript libraries.  Additionally
+its common to have 'snippets' of HTML that are shared across lots of documents (such as common
+header or footer elements, or advertizements panels, etc.)  You can describe these via directives
+but in order to empower designers and reduce your directive complexity L<Template::Pure> allowes
+one to insert HTML Processing instructions into your templates that get parsed when the template
+object is instantiated and added as additional directives.  This allows one to create directives
+declaratively in the template, rather than programtically in your code.
+
+The availability of this feature in no way suggests that one approach or the other is best.  You
+should determine that based on your team and project needs.
+
+L<Template::Pure> currently offers the following three processing instructions, and does not
+yet offer an API to create your own.  This may change in the future.
+
+B<NOTE> All processing instructions are parsed and evaluated during instantiation of your
+template object and all generated directives are adding to the end of your existing ones.  As
+a result these instructions are run last.
+
+=head1 Includes
+
+Allows one to inject a template render into a placeholder spot in the current template.  Example:
+
+    my $include_html = qq[
+      <span id="footer">Copyright&nbsp;</span>];
+
+    my $include = Template::Pure->new(
+      template=>$include_html,
+      directives=> [
+        '#footer+' => 'copyright_year',
+      ]);
+
+    my $base_html = q[
+      <html>
+        <head>
+          <title>Page Title: </title>
+        </head>
+        <body>
+          <div id='story'>Example Story</div>
+          <?pure-include src='foot_include' copyright_year='meta.copyright.year'?>
+        </body>
+      </html>
+    ];
+
+    my $base = Template::Pure->new(
+      template => $base_html,
+      directives => [
+        'title+' => 'meta.title',
+        '#story' => 'story',
+      ]
+    );
+
+    print $base->render({
+      story => 'It was a dark and stormy night...',
+      foot_include => $include
+      meta => {
+        title=>'Dark and Stormy..',
+        copyright => {
+          year => 2016,
+          author=>'jnap'}
+        }
+      },
+    });
+
+Returns:
+
+      <html>
+        <head>
+          <title>Page Title: Dark and Stormy..'</title>
+        </head>
+        <body>
+          <div id='story'>It was a dark and stormy night...</div>
+          <span id="footer">Copyright 2016</span>
+        </body>
+      </html>
+
+This is basically the same as:
+
+    my $base_html = q[
+      <html>
+        <head>
+          <title>Page Title: </title>
+        </head>
+        <body>
+          <div id='story'>Example Story</div>
+          <span id='footer'>...</span>
+        </body>
+      </html>
+    ];
+
+    my $base = Template::Pure->new(
+      template => $base_html,
+      directives => [
+        'title+' => 'meta.title',
+        '#story' => 'story',
+        '^#footer' => 'foot_include',
+      ]
+    );
+
+    print $base->render({
+      story => 'It was a dark and stormy night...',
+      foot_include => $include
+      meta => {
+        title=>'Dark and Stormy..',
+        copyright => {
+          year => 2016,
+          author=>'jnap'}
+        }
+      },
+    });
+
+Or alternatively (if you don't want to allow one to alter the include via
+processing data):
+
+    my $base_html = q[
+      <html>
+        <head>
+          <title>Page Title: </title>
+        </head>
+        <body>
+          <div id='story'>Example Story</div>
+          <span id='footer'>...</span>
+        </body>
+      </html>
+    ];
+
+    my $base = Template::Pure->new(
+      template => $base_html,
+      directives => [
+        'title+' => 'meta.title',
+        '#story' => 'story',
+        '^#footer' => $include,
+      ]
+    );
+
+    print $base->render({
+      story => 'It was a dark and stormy night...',
+      meta => {
+        title=>'Dark and Stormy..',
+        copyright => {
+          year => 2016,
+          author=>'jnap'}
+        }
+      },
+    });
+
+Basically you set the processing directive and the PI is fully replaced by the referenced
+template.  Format is like:
+
+  <?pure-include src=$data_path @args?>
+
+Where 'src' must be a data context path (see L<\Using Dot Notation in Directive Data Mapping>
+for more on referencing a data path) that is an instance of L<Template::Pure> and @args are
+a list of mappings to import data into the target include from the calling instance current
+data context.  Alternatively, you may set a data context root instead using 'ctx' as an
+argument:
+
+    my $include_html = qq[
+      <span id="footer">Copyright&nbsp;</span>];
+
+    my $include = Template::Pure->new(
+      template=>$include_html,
+      directives=> [
+        '#footer+' => 'copyright.year',
+      ]);
+
+    ...
+    <?pure-include src='foot_include' ctx='meta'?>
+    ...
+
+This might be the preferred method when you wish to copy a full section of data to your
+target include.  You may not combine the 'ctx' method and the named args method.
+
+If you do not specify a 'ctx' or named args, we default to a context of the root data
+context.  This probably leaks too much information into your include but is not terrible
+for prototyping.
+
+=head2 Wrapper
+
+Similar to the include processing instruction, it provides template authors with a declaritive
+approach to L</Object - Set the match value to another Pure Template>.  Example:
+
+    my $story_section_wrapper_html = qq[
+      <section>
+        <h1>story title</h1>
+        <p>By:&nbsp;</p>
+      </section>];
+
+    my $story_section_wrapper = Template::Pure->new(
+      template=>$story_section_wrapper_html,
+      directives=> [
+        'h1' => 'title',
+        'p+' => 'author',
+        '^p+' => 'content',
+      ]);
+
+    my $base_html = q[
+      <html>
+        <head>
+          <title>Page Title:&nbsp;</title>
+        </head>
+        <body>
+          <?pure-wrapper src='section_wrapper' ctx='meta'?>
+          <div id='story'>Example Story</div>
+        </body>
+      </html>
+    ];
+
+    my $base = Template::Pure->new(
+      template=>$base_html,
+      directives=> [
+        'title+' => 'meta.title',
+        '#story' => 'story,
+      ]
+    );
+
+    print $base->render({
+      story => 'Once Upon a Time...',
+      section_wrapper => $story_section_wrapper,
+      meta => {
+        title=>'Once',
+        author=>'jnap',
+      },
+    });
+
+Results in:
+
+    <html>
+      <head>
+        <title>Page Title:&nbsp;Once</title>
+      </head>
+      <body>
+        <section>
+          <h1>Once</h1>
+          <p>By:&nbsp;jnap</p>
+          <div id='story'>Once Upon a Time</div>
+        </section>
+      </body>
+    </html>
+
+This processing instructions 'wraps' the following tag node with the template that
+is the target of 'src'.  Like L</Includes> you may pass data via named parameters or
+by setting a new data context, as in the given example.
+
+Similar approach using directives only:
+
+    my $base = Template::Pure->new(
+      template=>$base_html,
+      directives=> [
+        'title+' => 'meta.title',
+        '#story' => 'story,
+        '^#story => $story_section_wrapper,
+      ]
+    );
+
+=head2 Overlay
+
+An overlay replaces the selected node with the results on another template.  Typically
+you will pass selected nodes of the original template as directives to the new template.
+This can be used to minic features like template inheritance, that exist in other templating
+systems.  One example:
+
+    my $overlay_html = q[
+      <html>
+        <head>
+          <title>Example Title</title>
+          <link rel="stylesheet" href="/css/pure-min.css"/>
+            <link rel="stylesheet" href="/css/grids-responsive-min.css"/>
+              <link rel="stylesheet" href="/css/common.css"/>
+          <script src="/js/3rd-party/angular.min.js"></script>
+            <script src="/js/3rd-party/angular.resource.min.js"></script>
+        </head>
+        <body>
+        </body>
+      </html>
+    ];
+
+    my $overlay = Template::Pure->new(
+      template=>$overlay_html,
+      directives=> [
+        'title' => 'title',
+        'head+' => 'scripts',
+        'body' => 'content',
+      ]);
+
+    my $base_html = q[
+      <?pure-overlay src='layout'
+        title=\'title'
+        scripts=\'^head script' 
+        content=\'body'?>
+      <html>
+        <head>
+          <title>Page Title:&nbsp;</title>
+          <script>
+          function foo(bar) {
+            return baz;
+          }
+          </script>
+        </head>
+        <body>
+          <div id='story'>Example Story</div>
+        </body>
+      </html>
+    ];
+
+    my $base = Template::Pure->new(
+      template=>$base_html,
+      directives=> [
+        'title+' => 'meta.title',
+        '#story' => 'story,
+      ]
+    );
+
+    print $base->render({
+      layout => $overlay,
+      story => 'Once Upon a Time...',
+      meta => {
+        title=>'Once',
+        author=>'jnap',
+      },
+    });
+
+Renders As:
+
+    <html>
+      <head>
+        <title>Once</title>
+        <link rel="stylesheet" href="/css/pure-min.css"/>
+          <link rel="stylesheet" href="/css/grids-responsive-min.css"/>
+            <link rel="stylesheet" href="/css/common.css"/>
+        <script src="/js/3rd-party/angular.min.js"></script>
+          <script src="/js/3rd-party/angular.resource.min.js"></script>
+            <script>
+            function foo(bar) {
+              return baz;
+            }
+            </script>
+      </head>
+      <body>
+        <div id='story'>Once Upon a Time...</div>
+      </body>
+    </html>
+
+The syntax of the processing instruction is:
+
+    <?pure-overlay src='' @args ?>
+
+Where 'src' is a data path to the template you want to use as the overlay, and @args is
+a list of key values which populate the data context of the overlay when you process it.
+Often these values will be references to existing nodes in the base template (as in the
+examples \'title' and \'body' above) but they can also be used to map values from your
+data context in the same way we do so for L</Include> and L</Wrapper>.
+
+If you were to write this as 'directives only' it would look like:
+
+    my $base = Template::Pure->new(
+      template=>$base_html,
+      directives=> [
+        'title+' => 'meta.title',
+        '#story' => 'story,
+        'html' => [
+          {
+            title => \'title'
+            script s=> \'^head script' 
+            content => \'body'
+          },
+          '^.' => 'layout',
+        ],
+      ]
+    );
+
+Please note that although in this example the overlay wrapped over the entire template, it is
+not limited to that, rather like the L</Wrapper> processing instruction it just takes the next
+tag node following as its overlay target.  So you could have more than one overlap in a document
+and can overlay sections for those cases where a L</Wrapper> is not sufficently complex.
 
 =head1 IMPORTANT NOTE REGARDING VALID HTML
 
