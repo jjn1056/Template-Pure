@@ -3,7 +3,7 @@ use warnings;
 
 package Template::Pure;
 
-our $VERSION = '0.014';
+our $VERSION = '0.015';
 
 use Mojo::DOM58;
 use Scalar::Util;
@@ -51,8 +51,9 @@ sub _prepare_dom {
         if($ctx) {
           @include_directives = ("#include-$placeholder_cnt" => +{ $ctx => ['^.' => "/$src"]});
         } elsif(%attrs) {
-          @include_directives = ("#include-$placeholder_cnt" => [\%attrs, '^.' => "/$src"]);
-        }else {
+          $attrs{$src} = "/$src";
+          @include_directives = ("#include-$placeholder_cnt" => [\%attrs, '^.' => "$src"]);
+        } else {
           @include_directives = ("^#include-$placeholder_cnt", $src)
         }
         push @directives, @include_directives;
@@ -65,8 +66,9 @@ sub _prepare_dom {
             "*[data-pure-wrapper-id=wrapper-$placeholder_cnt]\@data-pure-wrapper-id", sub { undef },
           );
         } elsif(%attrs) {
+          $attrs{$src} = "/$src";
           push @directives, (
-            "^*[data-pure-wrapper-id=wrapper-$placeholder_cnt]", [\%attrs, '^.' => "/$src"],
+            "^*[data-pure-wrapper-id=wrapper-$placeholder_cnt]", [\%attrs, '^.' => "$src"],
             "*[data-pure-wrapper-id=wrapper-$placeholder_cnt]\@data-pure-wrapper-id", sub { undef },
           );
         }else {
@@ -644,6 +646,12 @@ documenation could use another detailed review, and we'd benefit from some 'cook
 Nevertheless its all working well enough that I'd like to publish it so I can start using it 
 more widely and hopefully some of you will like what you see and be inspired to try and help
 close the gaps.
+
+B<NOTE> UPDATE: The code is starting to shape up and at this point I'm started to commit to
+things that pass the current test case should still pass in the future unless breaking changes
+are absolutely required to move the project forward. Main things to be worked out is if the
+rules around handling undef values and when we have an object as the loop iterator has not
+been as well tested as it should be.
 
 L<Template::Pure> HTML/XML Templating system, inspired by pure.js L<http://beebole.com/pure/>, with
 some additions and modifications to make it more Perlish and to be more suitable

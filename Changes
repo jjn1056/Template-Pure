@@ -1,7 +1,13 @@
 The following logs changes for the CPAN distribution Template::Pure
 
-0.015   TBD
+0.015   10 June 2016
+        - Code is considered less experimental than before and I am moving toward
+          feeling committed to the current test suite and documentation.
         - Corrected Changed document.
+        - POD Fixes
+        - New test case that combines looping with a processing instruction
+        - Fixed bug where passing parameters to a processing instruction
+          did not work as documented.
 
 0.014   19 April 2016
         - Migration from DOM::Tiny to Mojo::DOM58.  This is just a namespace change
