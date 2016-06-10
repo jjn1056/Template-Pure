@@ -2439,13 +2439,16 @@ John Napiorkowski L<email:jjnapiork@cpan.org>
   
 =head1 SEE ALSO
  
-L<Mojo::DOM58, L<HTML::Zoom>.  Both of these are approaches to programmatically examining and
+L<Mojo::DOM58>, L<HTML::Zoom>.  Both of these are approaches to programmatically examining and
 altering a DOM.
 
 L<Template::Semantic> is a similar system that uses XPATH instead of a CSS inspired matching
 specification.  It has more dependencies (including L<XML::LibXML> and doesn't separate the actual
 template data from the directives.  You might find this more simple approach appealing, 
-so its worth a look.
+so its worth alook.
+
+L<HTML::Seamstress> Seems to also be prior art along these lines but I have trouble following
+the code and it seems not active.  Might be worth looking at at least for ideas!
  
 =head1 COPYRIGHT & LICENSE
  
