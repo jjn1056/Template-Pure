@@ -110,3 +110,41 @@ __END__
     return $class;
   }
 
+ok my $timestamp_component = Template::Pure->new(
+  template=>q[
+    <
+  ],
+  directives=> [
+    title => 'title',
+    'pure-localtime|' => sub {
+      my ($t, $dom, $data) = @_;
+      my $localtime = Lace::Component::Localtime->new(%{$dom->attr||+{}});
+      $localtime->render_this($dom, $data);
+    }
+  ]
+);
+
+package Template::Pure::Component::Timestamp;
+
+use Moo;
+extends 'Template::Pure';
+
+has 'tz' => (
+  is=>'ro',
+  predicate=>'has_tz');
+
+sub now {
+  my $self = shift;
+  my $now = DateTime->now;
+  $now->set_time_zone($self->tz)
+    if $self->has_tz;
+
+  return $now;
+}
+
+sub template { q[<span>`timestamp`</span>] }
+sub directives { '#timestamp' => 'self.now' }
+
+
+
+

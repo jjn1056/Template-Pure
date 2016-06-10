@@ -1,7 +1,10 @@
 The following logs changes for the CPAN distribution Template::Pure
 
+0.015   TBD
+        - Corrected Changed document.
+
 0.014   19 April 2016
-        - Migration of Mojo::DOM58 to Mojo::DOM58.  This is just a namespace change
+        - Migration from DOM::Tiny to Mojo::DOM58.  This is just a namespace change
           it does not add Mojolicious as a dependency to the application.  This
           could also be a breaking change for you if you are hardcoding instances
           of Mojo::DOM58.  Should be a simple search and replace job.  I did warn you
