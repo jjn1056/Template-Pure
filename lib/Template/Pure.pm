@@ -21,14 +21,79 @@ sub new {
 
   die '"template" is required' unless $args{template};
 
-  my ($dom, @directives)  = $class->_prepare_dom($args{template});  
-  unshift @directives, @{$args{directives}};
+  my ($dom, @directives)  = $class->_prepare_dom(delete $args{template});  
+  unshift @directives, @{delete $args{directives}};
 
   return bless +{
-    filters => $args{filters} || +{},
+    filters => delete($args{filters}) || +{},
     directives => \@directives,
-    dom => $dom, 
+    dom => $dom,
+    %args,
   }, $class;
+}
+
+sub _process_pi {
+  my ($class, $placeholder_cnt, $item, $num, @directives) = @_;
+  my ($target, %attrs) = $class->parse_processing_instruction($item->tree->[1]);
+  my $ctx = delete $attrs{ctx};
+  my $src = delete $attrs{src};
+
+  if($target eq 'pure-include') {
+    $item->replace("<span id='include-$placeholder_cnt'>include placeholder</span>");
+    my @include_directives;
+    if($ctx) {
+      @include_directives = ("#include-$placeholder_cnt" => +{ $ctx => ['^.' => "/$src"]});
+    } elsif(%attrs) {
+      $attrs{$src} = "/$src";
+      @include_directives = ("#include-$placeholder_cnt" => [\%attrs, '^.' => "$src"]);
+    } else {
+      @include_directives = ("^#include-$placeholder_cnt", $src)
+    }
+    push @directives, @include_directives;
+  } elsif($target eq 'pure-wrapper') {
+    $item->following('*')->first->attr('data-pure-wrapper-id'=>"wrapper-$placeholder_cnt");
+    $item->remove;
+    if($ctx) {
+      push @directives, (
+        "^*[data-pure-wrapper-id=wrapper-$placeholder_cnt]", +{ $ctx => ['^.' => "/$src"]},
+        "*[data-pure-wrapper-id=wrapper-$placeholder_cnt]\@data-pure-wrapper-id", sub { undef },
+      );
+    } elsif(%attrs) {
+      $attrs{$src} = "/$src";
+      push @directives, (
+        "^*[data-pure-wrapper-id=wrapper-$placeholder_cnt]", [\%attrs, '^.' => "$src"],
+        "*[data-pure-wrapper-id=wrapper-$placeholder_cnt]\@data-pure-wrapper-id", sub { undef },
+      );
+    }else {
+      push @directives, (
+        "^*[data-pure-wrapper-id=wrapper-$placeholder_cnt]", $src,
+        "*[data-pure-wrapper-id=wrapper-$placeholder_cnt]\@data-pure-wrapper-id", sub { undef },
+      );
+    }
+  } elsif($target eq 'pure-overlay') {
+    $item->following('*')->first->attr('data-pure-overlay-id'=>"overlay-$placeholder_cnt");
+    $item->remove;
+    push @directives, (
+      "^*[data-pure-overlay-id=overlay-$placeholder_cnt]", [ +{%attrs, src=>$src }, '^.' => 'src'],
+      "*[data-pure-overlay-id=overlay-$placeholder_cnt]\@data-pure-overlay-id", sub { undef },
+    );
+  } else {
+    warn "Encountering processing instruction $target that I can't process";
+  }
+  $placeholder_cnt++;
+  return ($placeholder_cnt, @directives);
+}
+
+sub _process_node {
+  my ($class, $placeholder_cnt, $item, $num, @directives) = @_;
+  if($item->type eq 'pi') {
+    ($placeholder_cnt, @directives) = $class->_process_pi($placeholder_cnt, $item, $num, @directives)
+  }
+  $item->child_nodes->each(sub { 
+    ($placeholder_cnt, @directives) =  $class->_process_node($placeholder_cnt, @_, @directives);
+  });
+
+  return $placeholder_cnt, @directives;
 }
 
 sub _prepare_dom {
@@ -38,61 +103,10 @@ sub _prepare_dom {
 
   my $nodes = $dom->child_nodes;
   my $placeholder_cnt = 0;
-  my $do; $do = sub {
-    my ($item, $num) = @_;
-    if($item->type eq 'pi') {
-      my ($target, %attrs) = $class->parse_processing_instruction($item->tree->[1]);
-      my $ctx = delete $attrs{ctx};
-      my $src = delete $attrs{src};
-
-      if($target eq 'pure-include') {
-        $item->replace("<span id='include-$placeholder_cnt'>include placeholder</span>");
-        my @include_directives;
-        if($ctx) {
-          @include_directives = ("#include-$placeholder_cnt" => +{ $ctx => ['^.' => "/$src"]});
-        } elsif(%attrs) {
-          $attrs{$src} = "/$src";
-          @include_directives = ("#include-$placeholder_cnt" => [\%attrs, '^.' => "$src"]);
-        } else {
-          @include_directives = ("^#include-$placeholder_cnt", $src)
-        }
-        push @directives, @include_directives;
-      } elsif($target eq 'pure-wrapper') {
-        $item->following('*')->first->attr('data-pure-wrapper-id'=>"wrapper-$placeholder_cnt");
-        $item->remove;
-        if($ctx) {
-          push @directives, (
-            "^*[data-pure-wrapper-id=wrapper-$placeholder_cnt]", +{ $ctx => ['^.' => "/$src"]},
-            "*[data-pure-wrapper-id=wrapper-$placeholder_cnt]\@data-pure-wrapper-id", sub { undef },
-          );
-        } elsif(%attrs) {
-          $attrs{$src} = "/$src";
-          push @directives, (
-            "^*[data-pure-wrapper-id=wrapper-$placeholder_cnt]", [\%attrs, '^.' => "$src"],
-            "*[data-pure-wrapper-id=wrapper-$placeholder_cnt]\@data-pure-wrapper-id", sub { undef },
-          );
-        }else {
-          push @directives, (
-            "^*[data-pure-wrapper-id=wrapper-$placeholder_cnt]", $src,
-            "*[data-pure-wrapper-id=wrapper-$placeholder_cnt]\@data-pure-wrapper-id", sub { undef },
-          );
-        }
-      } elsif($target eq 'pure-overlay') {
-        $item->following('*')->first->attr('data-pure-overlay-id'=>"overlay-$placeholder_cnt");
-        $item->remove;
-        push @directives, (
-          "^*[data-pure-overlay-id=overlay-$placeholder_cnt]", [ +{%attrs, src=>$src }, '^.' => 'src'],
-          "*[data-pure-overlay-id=overlay-$placeholder_cnt]\@data-pure-overlay-id", sub { undef },
-        );
-      } else {
-        warn "Encountering processing instruction $target that I can't process";
-      }
-      $placeholder_cnt++;
-    }
-    $item->child_nodes->each($do);
-  };
-  $nodes->each($do);
-
+  $nodes->each(sub { 
+    ($placeholder_cnt, @directives) = $class->_process_node($placeholder_cnt, @_, @directives);
+  });
+  
   return ($dom, @directives);
 }
 
