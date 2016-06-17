@@ -25,6 +25,7 @@ sub new {
   my $self = bless +{
     filters => delete($args{filters}) || +{},
     directives => delete($args{directives}) || +{},
+    components => delete($args{components}) || +{},
     %args,
   }, $class;
 
@@ -89,14 +90,69 @@ sub _process_pi {
   return %params;
 }
 
+sub components { shift->{components} }
+sub initialized_components { shift->{initialized_components} }
+
+sub initialize_component {
+  my ($self, $name, %params) = @_;
+  return ($self->components->{$name} || die "No Component $name")->($self, %params);
+}
+
+sub _process_components {
+  my ($self, %params) = @_;
+  my %fields = (
+    %{$params{node}->attr||+{}},
+    parent => $params{component_current_parent}[-1]||undef,
+    inner_dom => $params{node},
+  );
+
+  my $component_id = $params{component_name}.'-'.$params{cnt};
+  my $component = $self->{initialized_components}{$component_id}
+    = $self->initialize_component($params{component_name}, %fields);
+
+  $params{component_current_parent}[-1]->add_child($component)
+      if $params{component_current_parent}[-1];
+
+  push @{$params{component_current_parent}}, $component;
+  $params{node}->attr('data-pure-component-id'=>$component_id);
+
+  push @{$params{directives}}, "^*[data-pure-component-id=$component_id]", sub {
+    my ($t, $dom, $data) = @_;
+    if(my($md5, $style) = $component->style_fragment) {
+     unless($dom->root->at("style#$md5")) {
+        $dom->root->at('head')->append_content("$style\n");
+       }  
+    }
+    if(my($md5, $script) = $component->script_fragment) {
+     unless($dom->root->at("script#$md5")) {
+        $dom->root->at('head')->append_content("$script\n");
+       }  
+    }
+    $t->encoded_string($component->render({data=>$data}));
+  };
+  $params{cnt}++;
+  return %params;
+}
+
 sub _process_node {
   my ($self, %params) = @_;
   if($params{node}->type eq 'pi') {
-    %params = $self->_process_pi(%params)
+    %params = $self->_process_pi(%params);
+  }
+
+  my $component_name;
+  if(($component_name) = (($params{node}->tag||'') =~m/^pure\-(.+)?/)) {
+    $params{component_current_parent} = [] unless defined $params{component_current_parent};
+    $params{component_name} = $component_name;
+    %params = $self->_process_components(%params);
+    delete $params{component_name};
   }
   $params{node}->child_nodes->each(sub { 
     %params = $self->_process_node(%params, node=>$_);
   });
+
+  pop @{$params{component_current_parent}} if defined $params{component_current_parent} && $component_name;
+
   return %params;
 }
 
