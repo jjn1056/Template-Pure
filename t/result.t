@@ -16,20 +16,15 @@ BEGIN {
 
   use base 'Template::Pure';
 
-  sub component {
+  sub new {
     my $class = shift;
-    return $class->new(@_,
+    return $class->SUPER::new(@_,
       template => $class->template,
       directives => [$class->directives]);
   }
 
   sub apply {
     my ($self, $dom, $data) = @_;
-    $dom->replace(
-      $self->render({
-        'data' => $data,
-    }));
-
     if(my($md5, $style) = $self->style_fragment) {
      unless($dom->root->at("style#$md5")) {
         $dom->root->at('head')->append_content("$style\n");
@@ -40,16 +35,17 @@ BEGIN {
         $dom->root->at('head')->append_content("$script\n");
        }  
     }
+    return $self->render({data=>$data});
   }
 
   sub inner_dom { return shift->{inner_dom} }
   sub parent { shift->{parent} }
-  sub subcomponents { @{shift->subcomponents} }
+  sub children { @{shift->{children}} }
 
-  sub push_subcomponents {
-    my ($self, $subcomponent) = @_;
-    push @{shift->{subcomponents}}, $subcomponent;
-    return $self->subcomponents;
+  sub add_child {
+    my ($self, $child) = @_;
+    push @{shift->{children}}, $child;
+    return $self->children;
   }
 
   sub style { }
@@ -77,18 +73,53 @@ BEGIN {
  
   extends 'Template::Pure';
 
-  my %registered_comps = ();
+
+  has 'components' => (is=>'ro');
   
-  sub build_component {
+  my %initialized_components;
+
+  sub initialized_components { %initialized_components }
+
+  sub initialize_component {
     my ($self, $name, %params) = @_;
-    return $name->component(%params);
+    return ($self->components->{$name} || return)->($self, %params);
   }
 
-  around '_process_pi', sub {
-    my ($orig, $class, $placeholder_cnt, $item, $num, @directives) = @_;
-    # if($item->type eq 'pi' and $
-    warn $item->tag if $item->tag;
-    return $class->$orig($placeholder_cnt, $item, $num, @directives);
+  around '_process_node', sub {
+    #my %params = (cnt=>0, node=>$node, directives=>\@directives);
+    my ($orig, $self, %params) = @_;
+    $params{component_current_parent} = [] unless defined $params{component_current_parent};
+    
+    use Devel::Dwarn;
+    Dwarn([map { ref $_ } @{$params{component_current_parent}}])
+      if defined $params{component_current_parent};
+
+    if(my ($component_name) = (($params{node}->tag||'') =~m/^pure\-(.+)?/)) {
+      my %fields = (
+        %{$params{node}->attr||+{}},
+        parent => $params{component_current_parent}[-1]||undef,
+        inner_dom => $params{node}->content,
+      );
+      my $component_id = $component_name.'-'.$params{cnt};
+      $initialized_components{$component_id} = $self->initialize_component($component_name, %fields);
+      $params{component_current_parent}[-1]->add_child($initialized_components{$component_id})
+          if $params{component_current_parent}[-1];
+
+      push @{$params{component_current_parent}}, $initialized_components{$component_id};
+      $params{node}->attr('data-pure-component-id'=>$component_id);
+
+      push @{$params{directives}}, "^*[data-pure-component-id=$component_id]", sub {
+        my ($t, $dom, $data) = @_;
+        my $comp = $initialized_components{$component_id} || return;
+        $t->encoded_string($comp->apply($dom, $data));
+      };
+      $params{cnt}++;
+      %params = $self->$orig(%params);
+      pop @{$params{component_current_parent}} if defined $params{component_current_parent};
+      return %params;
+    } else {
+      return $self->$orig(%params)
+    }
   };
   
   package Local::Timestamp;
@@ -140,10 +171,37 @@ BEGIN {
   sub directives {
     'pre' => 'self.inner_dom',
   }
+
+  package Local::Form;
+
+  use Moo;
+  use DateTime;
+
+  extends 'Template::Pure::Component';
+
+  sub template { q[<form></form>] }
+
+  sub directives {
+    'form' => 'self.inner_dom',
+  }
+
+  package Local::Input;
+
+  use Moo;
+  use DateTime;
+
+  extends 'Template::Pure::Component';
+
+  sub template { q[<input></input>] }
+
+  sub directives {
+    'input' => 'self.inner_dom',
+  }
+
+
 }
 
 ok my $html_template = q[
-  <?pure-component src='Local::Timestamp' as='pure-timestamp' ctx='settings.time'?>
   <html>
     <head>
       <title>Page Title: </title>
@@ -151,6 +209,10 @@ ok my $html_template = q[
     <body>
       <p>Time in NYC: <pure-timestamp tz='America/New_York'/></p>
       <p>Time in Chicago: <pure-timestamp tz='America/Chicago' /></p>
+      <pure-form>
+        <pure-input />
+      </pure-form>
+
       <pure-code>
       package Example::User;
 
@@ -171,27 +233,28 @@ ok my $html_template = q[
 ];
 
 ok my $pure = Template::Pure::HasComponents->new(
+  components=>+{
+    timestamp => sub {
+      my ($self, %params) = @_;
+      return Local::Timestamp->new(%params);
+    },
+    code => sub {
+      my ($self, %params) = @_;
+      return Local::Code->new(%params);
+    },
+    form => sub {
+      my ($self, %params) = @_;
+      return Local::Form->new(%params);
+    },
+    input => sub {
+      my ($self, %params) = @_;
+      return Local::Input->new(%params);
+    },
+    
+  },
   template=>$html_template,
   directives=> [
     title => 'title',
-    'pure-code|' => sub {
-      my ($t, $dom, $data) = @_;
-      my %params = (
-        %{$dom->attr||+{}},
-        inner_dom => $dom->content,
-      );
-      my $code = $t->build_component('Local::Code', %params);
-      $code->apply($dom, $data);
-    },
-    'pure-timestamp|' => sub {
-      my ($t, $dom, $data) = @_;
-      my %params = (
-        %{$dom->attr||+{}},
-        inner_dom => $dom->content,
-      );
-      my $timestamp = $t->build_component('Local::Timestamp', %params);
-      $timestamp->apply($dom, $data);
-    }
   ]
 );
 
@@ -203,6 +266,10 @@ ok my $string = $pure->render(\%data);
 ok my $dom = Mojo::DOM58->new($string);
 
 #warn $string;
+
+use Devel::Dwarn;
+my %a=$pure->initialized_components;
+#Dwarn( $a{'input-3'}->parent->children );
 
 
 done_testing;

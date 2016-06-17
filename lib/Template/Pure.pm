@@ -21,93 +21,97 @@ sub new {
 
   die '"template" is required' unless $args{template};
 
-  my ($dom, @directives)  = $class->_prepare_dom(delete $args{template});  
-  unshift @directives, @{delete $args{directives}};
-
-  return bless +{
+  my $template = delete $args{template};
+  my $self = bless +{
     filters => delete($args{filters}) || +{},
-    directives => \@directives,
-    dom => $dom,
+    directives => delete($args{directives}) || +{},
     %args,
   }, $class;
+
+  my ($dom, @directives)  = $self->_prepare_dom($template);  
+  unshift @directives, @{$self->{directives}};
+
+  $self->{dom} = $dom;
+  $self->{directives} = \@directives;
+  return $self;
 }
 
 sub _process_pi {
-  my ($class, $placeholder_cnt, $item, $num, @directives) = @_;
-  my ($target, %attrs) = $class->parse_processing_instruction($item->tree->[1]);
+  #my %params = (cnt=>0, node=>$node, directives=>\@directives);
+  my ($self, %params) = @_;
+  my ($target, %attrs) = $self->parse_processing_instruction($params{node}->tree->[1]);
   my $ctx = delete $attrs{ctx};
   my $src = delete $attrs{src};
 
   if($target eq 'pure-include') {
-    $item->replace("<span id='include-$placeholder_cnt'>include placeholder</span>");
+    $params{node}->replace("<span id='include-$params{cnt}'>include placeholder</span>");
     my @include_directives;
     if($ctx) {
-      @include_directives = ("#include-$placeholder_cnt" => +{ $ctx => ['^.' => "/$src"]});
+      @include_directives = ("#include-$params{cnt}" => +{ $ctx => ['^.' => "/$src"]});
     } elsif(%attrs) {
       $attrs{$src} = "/$src";
-      @include_directives = ("#include-$placeholder_cnt" => [\%attrs, '^.' => "$src"]);
+      @include_directives = ("#include-$params{cnt}" => [\%attrs, '^.' => "$src"]);
     } else {
-      @include_directives = ("^#include-$placeholder_cnt", $src)
+      @include_directives = ("^#include-$params{cnt}", $src)
     }
-    push @directives, @include_directives;
+    push @{$params{directives}}, @include_directives;
   } elsif($target eq 'pure-wrapper') {
-    $item->following('*')->first->attr('data-pure-wrapper-id'=>"wrapper-$placeholder_cnt");
-    $item->remove;
+    $params{node}->following('*')->first->attr('data-pure-wrapper-id'=>"wrapper-$params{cnt}");
+    $params{node}->remove;
     if($ctx) {
-      push @directives, (
-        "^*[data-pure-wrapper-id=wrapper-$placeholder_cnt]", +{ $ctx => ['^.' => "/$src"]},
-        "*[data-pure-wrapper-id=wrapper-$placeholder_cnt]\@data-pure-wrapper-id", sub { undef },
+      push @{$params{directives}}, (
+        "^*[data-pure-wrapper-id=wrapper-$params{cnt}]", +{ $ctx => ['^.' => "/$src"]},
+        "*[data-pure-wrapper-id=wrapper-$params{cnt}]\@data-pure-wrapper-id", sub { undef },
       );
     } elsif(%attrs) {
       $attrs{$src} = "/$src";
-      push @directives, (
-        "^*[data-pure-wrapper-id=wrapper-$placeholder_cnt]", [\%attrs, '^.' => "$src"],
-        "*[data-pure-wrapper-id=wrapper-$placeholder_cnt]\@data-pure-wrapper-id", sub { undef },
+      push @{$params{directives}}, (
+        "^*[data-pure-wrapper-id=wrapper-$params{cnt}]", [\%attrs, '^.' => "$src"],
+        "*[data-pure-wrapper-id=wrapper-$params{cnt}]\@data-pure-wrapper-id", sub { undef },
       );
     }else {
-      push @directives, (
-        "^*[data-pure-wrapper-id=wrapper-$placeholder_cnt]", $src,
-        "*[data-pure-wrapper-id=wrapper-$placeholder_cnt]\@data-pure-wrapper-id", sub { undef },
+      push @{$params{directives}}, (
+        "^*[data-pure-wrapper-id=wrapper-$params{cnt}]", $src,
+        "*[data-pure-wrapper-id=wrapper-$params{cnt}]\@data-pure-wrapper-id", sub { undef },
       );
     }
   } elsif($target eq 'pure-overlay') {
-    $item->following('*')->first->attr('data-pure-overlay-id'=>"overlay-$placeholder_cnt");
-    $item->remove;
-    push @directives, (
-      "^*[data-pure-overlay-id=overlay-$placeholder_cnt]", [ +{%attrs, src=>$src }, '^.' => 'src'],
-      "*[data-pure-overlay-id=overlay-$placeholder_cnt]\@data-pure-overlay-id", sub { undef },
+    $params{node}->following('*')->first->attr('data-pure-overlay-id'=>"overlay-$params{cnt}");
+    $params{node}->remove;
+    push @{$params{directives}}, (
+      "^*[data-pure-overlay-id=overlay-$params{cnt}]", [ +{%attrs, src=>$src }, '^.' => 'src'],
+      "*[data-pure-overlay-id=overlay-$params{cnt}]\@data-pure-overlay-id", sub { undef },
     );
   } else {
     warn "Encountering processing instruction $target that I can't process";
   }
-  $placeholder_cnt++;
-  return ($placeholder_cnt, @directives);
+  $params{cnt}++;
+  return %params;
 }
 
 sub _process_node {
-  my ($class, $placeholder_cnt, $item, $num, @directives) = @_;
-  if($item->type eq 'pi') {
-    ($placeholder_cnt, @directives) = $class->_process_pi($placeholder_cnt, $item, $num, @directives)
+  my ($self, %params) = @_;
+  if($params{node}->type eq 'pi') {
+    %params = $self->_process_pi(%params)
   }
-  $item->child_nodes->each(sub { 
-    ($placeholder_cnt, @directives) =  $class->_process_node($placeholder_cnt, @_, @directives);
+  $params{node}->child_nodes->each(sub { 
+    %params = $self->_process_node(%params, node=>$_);
   });
-
-  return $placeholder_cnt, @directives;
+  return %params;
 }
 
 sub _prepare_dom {
-  my ($class, $template) = @_;
+  my ($self, $template) = @_;
   my @directives = ();
   my $dom = Mojo::DOM58->new($template);
-
+  my %params = (cnt=>0, node=>$dom, directives=>\@directives);
   my $nodes = $dom->child_nodes;
-  my $placeholder_cnt = 0;
-  $nodes->each(sub { 
-    ($placeholder_cnt, @directives) = $class->_process_node($placeholder_cnt, @_, @directives);
+
+  $nodes->each(sub {
+      %params = $self->_process_node(%params, node=>$_);
   });
   
-  return ($dom, @directives);
+  return ($dom, @{$params{directives}});
 }
 
 sub clone_dom { return dclone(shift->{dom}) }
@@ -185,18 +189,26 @@ sub _process_dom_recursive {
     } elsif(Scalar::Util::blessed($action_proto)) {
       $self->_process_obj($dom, $data, $action_proto, %match_spec);
     } else {
-      my $value = $self->_value_from_action_proto($dom, $data, $action_proto, %match_spec);
-      if(Scalar::Util::blessed($value) && ($value->isa('Template::Pure') || $value->can('TO_HTML') ) ) {
-        $self->_process_obj($dom, $data, $value, %match_spec);
-      } elsif((ref($value)||'') eq 'CODE') {
-        $self->_process_code($dom, $data, $value, %match_spec);
-      } else {
-        $self->_process_match_spec($dom, $value, %match_spec);
-      }
+      my $value_proto = $self->_value_from_action_proto($dom, $data, $action_proto, %match_spec);
+      $self->_process_value_proto($dom, $data, $value_proto, %match_spec);
     }
   }
 
   return $dom;
+}
+
+sub _process_value_proto {
+  my ($self, $dom, $data, $value_proto, %match_spec) = @_;
+  if(
+    Scalar::Util::blessed($value_proto) &&
+    ($value_proto->isa('Template::Pure') || $value_proto->can('TO_HTML')) 
+  ) {
+    $self->_process_obj($dom, $data, $value_proto, %match_spec);
+  } elsif((ref($value_proto)||'') eq 'CODE') {
+    $self->_process_code($dom, $data, $value_proto, %match_spec);
+  } else {
+    $self->_process_match_spec($dom, $value_proto, %match_spec);
+  }
 }
 
 sub _process_obj {
