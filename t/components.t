@@ -4,59 +4,9 @@ BEGIN {
   use Template::Pure;
   plan skip_all => "Moo required, err $@" 
     unless eval "use Moo; 1";
-  plan skip_all => "Digest::MD5 required, err $@" 
-    unless eval "use Digest::MD5; 1";  
 }
 
 {
-  package Template::Pure::Component;
-
-  use Template::Pure;
-  use Digest::MD5 qw(md5_hex);
-
-  use base 'Template::Pure';
-
-  sub new {
-    my $class = shift;
-    return $class->SUPER::new(@_,
-      template => $class->template,
-      directives => [$class->directives]);
-  }
-
-  sub inner_dom {
-    my $self = shift;
-    return $self->encoded_string(
-      $self->{inner_dom}->content);
-  }
-
-  sub parent { shift->{parent} }
-  sub children { @{shift->{children}} }
-
-  sub add_child {
-    my ($self, $child) = @_;
-    push @{shift->{children}}, $child;
-    return $self->children;
-  }
-
-  sub style { }
-  sub script { }
-  sub template { }
-  sub directives { }
-
-  sub style_fragment {
-    my $style = $_[0]->style;
-    return unless $style;
-    my $checksum = md5_hex($style);
-    return $checksum, "<style type='text/css' id='$checksum'>$style</style>";
-  }
-
-  sub script_fragment {
-    my $script = $_[0]->script;
-    return unless $script;
-    my $checksum = md5_hex($script);
-    return $checksum, "<script type='text/javascript' id='$checksum'>$script</script>";
-  }
-
   package Local::Timestamp;
 
   use Moo;
@@ -104,7 +54,7 @@ BEGIN {
   sub template { q[<pre></pre>] }
 
   sub directives {
-    'pre' => 'self.inner_dom',
+    'pre' => 'self.inner',
   }
 
   package Local::Form;
@@ -117,7 +67,7 @@ BEGIN {
   sub template { q[<form></form>] }
 
   sub directives {
-    'form' => 'self.inner_dom',
+    'form' => 'self.inner',
   }
 
   package Local::Input;
@@ -132,7 +82,7 @@ BEGIN {
   sub template { q[<input></input>] }
 
   sub directives {
-    'input' => 'self.inner_dom',
+    'input' => 'self.inner',
     'input@href' => 'self.a',
   }
 }
@@ -217,6 +167,13 @@ is $pure->initialized_components->{'code-6'}->children, 1;
 is_deeply [ map { $_->{a} } $pure->initialized_components->{'input-3'}->parent->children ], 
   [qw/foo bar baz/];
 
-warn $string;
+ok $dom->find('script')->[0]->content;
+ok $dom->find('style')->[0]->content;
+ok $dom->find('form')->[0]->content;
+ok $dom->find('pre')->[0]->content;
+ok $dom->find('input')->[2];
+ok $dom->find('.timestamp')->[1]->content;
+
+#warn $string;
 
 done_testing;

@@ -3,7 +3,7 @@ use warnings;
 
 package Template::Pure;
 
-our $VERSION = '0.015';
+our $VERSION = '0.016';
 
 use Mojo::DOM58;
 use Scalar::Util;
@@ -19,12 +19,12 @@ sub new {
   my ($proto, %args) = @_;
   my $class = ref($proto) || $proto;
 
-  die '"template" is required' unless $args{template};
-
-  my $template = delete $args{template};
+  my $template = delete($args{template}) || $class->template || die "Can't find a template";
+  my $directives = delete($args{directives}) || [$class->directives];
+  
   my $self = bless +{
     filters => delete($args{filters}) || +{},
-    directives => delete($args{directives}) || +{},
+    directives => $directives,
     components => delete($args{components}) || +{},
     %args,
   }, $class;
@@ -38,7 +38,6 @@ sub new {
 }
 
 sub _process_pi {
-  #my %params = (cnt=>0, node=>$node, directives=>\@directives);
   my ($self, %params) = @_;
   my ($target, %attrs) = $self->parse_processing_instruction($params{node}->tree->[1]);
   my $ctx = delete $attrs{ctx};
@@ -103,7 +102,7 @@ sub _process_components {
   my %fields = (
     %{$params{node}->attr||+{}},
     parent => $params{component_current_parent}[-1]||undef,
-    inner_dom => $params{node},
+    node => $params{node},
   );
 
   my $component_id = $params{component_name}.'-'.$params{cnt};

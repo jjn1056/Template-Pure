@@ -1,5 +1,10 @@
 The following logs changes for the CPAN distribution Template::Pure
 
+0.016   17 June 2016
+        - 'Dark launch' of new components feature.  No docs, but you can look
+          at the test case (t/components.t) and at Template::Pure::Component
+          source code for the idea.  Docs to come.
+
 0.015   10 June 2016
         - Code is considered less experimental than before and I am moving toward
           feeling committed to the current test suite and documentation.
