@@ -7,6 +7,15 @@ BEGIN {
 }
 
 {
+  package Local::Template::Pure::Obj;
+
+  use Moo;
+
+  sub TO_HTML {
+    my ($self, $pure, $dom, $data) = @_;
+    return 'obj'x3;
+  }
+
   package Local::Template::Pure::Custom;
 
   use Moo;
@@ -15,12 +24,22 @@ BEGIN {
   has 'version' => (is=>'ro', required=>1);
 
   sub time {
+  my $self = shift;
     return sub {
     my ($self, $dom, $data) = @_;
     $dom->attr(foo=>'bar');
     return 'Mon Apr 11 10:49:42 2016';
     };
   }
+
+  sub obj {
+    my $self = shift;
+    return sub {
+    my ($self, $dom, $data) = @_;
+    return Local::Template::Pure::Obj->new;
+    };
+  }
+
 }
 
 ok my $html_template = qq[
@@ -32,6 +51,7 @@ ok my $html_template = qq[
       <div id='version'>Version</div>
       <div id='main'>Test Body</div>
       <div id='foot'>Footer</div>
+      <div id='obj'>...</div>
     </body>
   </html>
 ];
@@ -44,6 +64,7 @@ ok my $pure = Local::Template::Pure::Custom->new(
     '#version' => 'self.version',
     '#main' => 'story',
     '#foot' => 'self.time',
+    '#obj' => 'self.obj',
   ]
 );
 
@@ -63,5 +84,7 @@ is $dom->at('#version')->content, '100';
 is $dom->at('#main')->content, 'XXX';
 is $dom->at('#foot')->content, 'Mon Apr 11 10:49:42 2016';
 is $dom->at('#foot')->attr('foo'), 'bar';
+
+warn $string;
 
 done_testing;

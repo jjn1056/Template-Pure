@@ -1,7 +1,7 @@
 package Template::Pure::Component;
 
 use Template::Pure;
-use Digest::Perl::MD5 ();
+use Digest::MD5 ();
 
 use base 'Template::Pure';
 
@@ -20,17 +20,17 @@ sub add_child {
   return $self->children;
 }
 
-sub style { }
+sub style { shift->{style} }
 sub style_fragment {
   my $style = $_[0]->style || return;
-  my $checksum = Digest::Perl::MD5::md5_hex($style);
+  my $checksum = Digest::MD5::md5_hex($style);
   return $checksum, "<style type='text/css' id='$checksum'>$style</style>";
 }
 
-sub script { }
+sub script { shift->{script} }
 sub script_fragment {
   my $script = $_[0]->script || return;
-  my $checksum = Digest::Perl::MD5::md5_hex($script);
+  my $checksum = Digest::MD5::md5_hex($script);
   return $checksum, "<script type='text/javascript' id='$checksum'>$script</script>";
 }
 
