@@ -3,8 +3,8 @@ The following logs changes for the CPAN distribution Template::Pure
 0.017   22 June 2016
         - Use Digest::MD5 instead of the pure Perl version since its actually
           bundled with older Perls anyway.
-        - When the path of the data context points to a method send that method
-          the other parts of the data context as well as $self.
+        - Methods that return a coderef can now return an object as well as a
+          scalar from the coderef.
 
 0.016   17 June 2016
         - 'Dark launch' of new components feature.  No docs, but you can look

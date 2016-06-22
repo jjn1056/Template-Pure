@@ -83,8 +83,7 @@ is $dom->at('title'), '<title>A subclass</title>';
 is $dom->at('#version')->content, '100';
 is $dom->at('#main')->content, 'XXX';
 is $dom->at('#foot')->content, 'Mon Apr 11 10:49:42 2016';
+is $dom->at('#obj')->content, 'objobjobj';
 is $dom->at('#foot')->attr('foo'), 'bar';
-
-warn $string;
 
 done_testing;

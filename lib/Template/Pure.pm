@@ -358,12 +358,15 @@ sub _process_code {
   my $css = $match_spec{css};
   if($css eq '.') {
     my $value = $code->($self, $dom, $data->value);
-    $self->_process_mode($dom, $value, %match_spec);
+    #$self->_process_mode($dom, $value, %match_spec);
+    $self->_process_value_proto($dom, $data, $value, %match_spec);
   } else {
     my $collection = $dom->find($css);
     $collection->each(sub {
       my $value = $code->($self, $_, $data->value);
-      $self->_process_mode($_, $value, %match_spec);
+      #$self->_process_mode($_, $value, %match_spec);
+      my %local_match_spec = (%match_spec, css=>'.');
+      $self->_process_value_proto($_, $data, $value, %local_match_spec);
     });
   }
 }
@@ -1925,6 +1928,9 @@ and to modify the DOM, you can return a CODEREF:
         };
       }
     }
+
+Such a coderef may return a scalar value, an object or any other type of
+data type we can process.
 
 =head2 Remapping Your Data Context
 
