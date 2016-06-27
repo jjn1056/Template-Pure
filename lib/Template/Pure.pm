@@ -3,7 +3,7 @@ use warnings;
 
 package Template::Pure;
 
-our $VERSION = '0.016';
+our $VERSION = '0.018';
 
 use Mojo::DOM58;
 use Scalar::Util;
@@ -115,20 +115,13 @@ sub _process_components {
   push @{$params{component_current_parent}}, $component;
   $params{node}->attr('data-pure-component-id'=>$component_id);
 
-  push @{$params{directives}}, "^*[data-pure-component-id=$component_id]", sub {
-    my ($t, $dom, $data) = @_;
-    if(my($md5, $style) = $component->style_fragment) {
-     unless($dom->root->at("style#$md5")) {
-        $dom->root->at('head')->append_content("$style\n");
-       }  
-    }
-    if(my($md5, $script) = $component->script_fragment) {
-     unless($dom->root->at("script#$md5")) {
-        $dom->root->at('head')->append_content("$script\n");
-       }  
-    }
-    $t->encoded_string($component->render({data=>$data}));
-  };
+  %params = $component->on_process_components($self, %params)
+    if $component->can('on_process_components');
+
+  push @{$params{directives}}, (
+    "^*[data-pure-component-id=$component_id]",
+    $component->prepare_render_callback );
+
   $params{cnt}++;
   return %params;
 }

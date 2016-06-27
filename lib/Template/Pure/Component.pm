@@ -34,6 +34,29 @@ sub script_fragment {
   return $checksum, "<script type='text/javascript' id='$checksum'>$script</script>";
 }
 
+sub process_root {
+  my ($self, $root) = @_;
+  if(my($md5, $style) = $self->style_fragment) {
+   unless($root->at("style#$md5")) {
+      $root->at('head')->append_content("$style\n");
+     }  
+  }
+  if(my($md5, $script) = $self->script_fragment) {
+   unless($root->at("script#$md5")) {
+      $root->at('head')->append_content("$script\n");
+     }  
+  }
+}
+
+sub prepare_render_callback {
+  my $self = shift;
+  return sub {
+    my ($t, $dom, $data) = @_;
+    $self->process_root($dom->root, $data);
+    $t->encoded_string($self->render({data=>$data}));
+  };
+}
+
 1;
 
 =head1 NAME

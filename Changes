@@ -1,5 +1,12 @@
 The following logs changes for the CPAN distribution Template::Pure
 
+0.018   27 June 2015
+        - Fixed VERSION typo preventing properly upgrade installation.
+        - Components now are responsible for adding any styles and scripts
+          to the DOM root.
+        - New component hook to modify setup parameters.
+        - Components now can override how the render callback is created.
+
 0.017   22 June 2016
         - Use Digest::MD5 instead of the pure Perl version since its actually
           bundled with older Perls anyway.
