@@ -167,13 +167,13 @@ is $pure->initialized_components->{'code-6'}->children, 1;
 is_deeply [ map { $_->{a} } $pure->initialized_components->{'input-3'}->parent->children ], 
   [qw/foo bar baz/];
 
+#warn $string;
+
 ok $dom->find('script')->[0]->content;
 ok $dom->find('style')->[0]->content;
 ok $dom->find('form')->[0]->content;
 ok $dom->find('pre')->[0]->content;
 ok $dom->find('input')->[2];
 ok $dom->find('.timestamp')->[1]->content;
-
-#warn $string;
 
 done_testing;

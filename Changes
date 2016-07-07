@@ -1,6 +1,11 @@
 The following logs changes for the CPAN distribution Template::Pure
 
-0.018   27 June 2015
+0.019   07 July 2016
+        - You may now use a data placeholder in a match specification
+        - You may now pass a coderef to replace a match => action pair
+          for custom or speciality processing.
+
+0.018   27 June 2016
         - Fixed VERSION typo preventing properly upgrade installation.
         - Components now are responsible for adding any styles and scripts
           to the DOM root.

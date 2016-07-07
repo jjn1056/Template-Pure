@@ -17,11 +17,12 @@ ok my $html = q[
 ok my $pure = Template::Pure->new(
   template=>$html,
   directives=> [
-    '#story' => '={meta.title | upper}: ={story} on ={meta.date}',
+    'body ={story_target}' => '={meta.title | upper}: ={story} on ={meta.date}',
     '#footer' => '={meta.title} on ={meta.date}',
 ]);
 
 ok my $data = +{
+  story_target => '#story',
   meta => {
     title => 'Inner Stuff',
     date => '1/1/2020',

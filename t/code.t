@@ -10,6 +10,7 @@ ok my $html = q[
     <body>
       <p>foo</p>
       <p>baz</p>
+      <div id="111"></div>
     </body>
   </html>
 ];
@@ -17,6 +18,10 @@ ok my $html = q[
 ok my $pure = Template::Pure->new(
   template=>$html,
   directives=> [
+    sub {
+      my ($template, $dom, $data) = @_;
+      $dom->at('#111')->content("coderef");
+    },
     'p' => sub {
       my ($template, $dom, $data) = @_;
       Test::Most::is ref($template), 'Template::Pure';
@@ -37,8 +42,9 @@ ok my $dom = Mojo::DOM58->new($string);
 
 is $dom->find('p')->[0]->content, 'foo is you';
 is $dom->find('p')->[1]->content, 'baz is raz';
+is $dom->at('#111')->content, 'coderef';
 
 # count tests because the ones in the sub callback might not get
 # run if there's trouble in the code.
 #
-done_testing(11); 
+done_testing(12);

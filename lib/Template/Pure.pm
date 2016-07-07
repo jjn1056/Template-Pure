@@ -3,7 +3,7 @@ use warnings;
 
 package Template::Pure;
 
-our $VERSION = '0.018';
+our $VERSION = '0.019';
 
 use Mojo::DOM58;
 use Scalar::Util;
@@ -221,7 +221,19 @@ sub _process_dom_recursive {
   ($data, @directives) = $self->_process_directive_instructions($dom, $data, @directives);
 
   while(@directives) {
-    my %match_spec = $self->parse_match_spec (shift @directives);
+    my $directive = shift @directives;
+
+    if(ref($directive)||'' eq 'CODE') {
+      $directive->($self, $dom, $data); 
+      next;
+    }
+    if($directive =~/\=\{/g) {
+      $directive = join '', map {
+        ref $_ ? $self->_value_from_data($data, %$_) : $_; 
+      } $self->parse_data_template($directive);
+    }
+
+    my %match_spec = $self->parse_match_spec($directive);
     my $action_proto = shift @directives;
 
     $dom = $dom->root if $match_spec{absolute};
@@ -1053,6 +1065,56 @@ $data in helper objects, so you can't be 100% certain of the actual structure.  
 using this method wouldbe a good idea anyway since it lets you achieve an API that is
 complete independent of your actual data structure (this way if you later change from a 
 simple hashref to an object, your code wouldn't break.
+
+=head3 Coderef - No match specification
+
+Sometimes you may wish to have highly customized transformations, ones that are
+not directly attached to a match specification.  In those cases you may pass a
+match specification without a CSS match:
+
+    my $html = q[
+      <html>
+        <head>
+          <title>Page Title</title>
+        </head>
+        <body>
+          <p>foo</p>
+          <p>baz</p>
+          <div id="111"></div>
+        </body>
+      </html>
+    ];
+
+    my $pure = Template::Pure->new(
+      template=>$html,
+      directives=> [
+        sub {
+          my ($template, $dom, $data) = @_;
+          $dom->at('#111')->content("coderef");
+        },
+        'p' => sub {
+          my ($template, $dom, $data) = @_;
+          return $template->data_at_path($data, $dom->content)
+        }
+      ]);
+
+    my $data = +{
+      foo => 'foo is you',
+      baz => 'baz is raz',
+    };
+
+Renders as:
+
+    <html>
+      <head>
+        <title>Page Title</title>
+      </head>
+      <body>
+        <p>foo is you</p>
+        <p>baz is raz</p>
+        <div id="111">coderef</div>
+      </body>
+    </html>
 
 =head2 Arrayref - Run directives under a new DOM root
 
@@ -2002,7 +2064,41 @@ paths can be simple or complex, and even contain filters:
 
 For more on filters see L</FILTERS>
 
-=head2 Special indicators in your match.
+=head2 Using Placeholders in your Match Specification
+
+Sometimes you may wish to allow the user that is rendering a template the
+ability to influence the match specification.  To grant this ability you
+may use a placeholder:
+
+    my $html = q[
+      <html>
+        <head>
+          <title>Page Title</title>
+        </head>
+        <body>
+          <p id="story">Some Stuff</p>
+          <p id="footer">...</p>
+        </body>
+      </html>
+    ];
+
+    my $pure = Template::Pure->new(
+      template=>$html,
+      directives=> [
+        'body ={story_target}' => '={meta.title | upper}: ={story} on ={meta.date}',
+        '#footer' => '={meta.title} on ={meta.date}',
+    ]);
+
+    my $data = +{
+      story_target => '#story',
+      meta => {
+        title => 'Inner Stuff',
+        date => '1/1/2020',
+      },
+      story => 'XX' x 10,
+    };
+
+=head2 Special indicators in your Match Specification
 
 In General your match specification is a CSS match supported by the
 underlying HTML parser.  However the following specials are supported
