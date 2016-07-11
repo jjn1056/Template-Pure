@@ -39,7 +39,7 @@ sub parse_data_template {
   my ($spec) = @_;
   $spec=~s/\r|\n//gs; # cleanup newlines.
 
-  my $opentag = qr/={/;
+  my $opentag = qr/=\{/;
   my $closetag = qr/}/;
   my $placeholder = qr{(
     (?:
