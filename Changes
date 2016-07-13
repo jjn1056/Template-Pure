@@ -1,6 +1,6 @@
 The following logs changes for the CPAN distribution Template::Pure
 
-0.020   TBA
+0.020   13 July 2016
         - Bugfixes for object iterator
         - When the matchspec is 'append' or 'prepend' and the target action
           is undef we no longer delete the matched node.
