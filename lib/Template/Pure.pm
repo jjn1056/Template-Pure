@@ -3,7 +3,7 @@ use warnings;
 
 package Template::Pure;
 
-our $VERSION = '0.019';
+our $VERSION = '0.020';
 
 use Mojo::DOM58;
 use Scalar::Util;
@@ -229,7 +229,7 @@ sub _process_dom_recursive {
     }
     if($directive =~/\=\{/g) {
       $directive = join '', map {
-        ref $_ ? $self->_value_from_data($data, %$_) : $_; 
+        ref $_ eq 'HASH' ? $self->_value_from_data($data, %$_) : $_; 
       } $self->parse_data_template($directive);
     }
 
@@ -349,8 +349,22 @@ sub _value_from_scalar_action {
     )
   ) {
     my @parts = map { 
-      ref $_ ? $self->_value_from_data($data, %$_) : $_; 
+      ref $_ eq 'HASH' ? $self->_value_from_data($data, %$_) : $_; 
     } $self->parse_data_template($action_proto);
+
+    # If the last part is a literal AND it has trailing filters
+    # we need to process the filters.  And deal with all the special cases...
+    if(Scalar::Util::blessed $parts[-1] and index("$parts[-1]", '|')) {
+      my $last = substr "$parts[-1]", 0, index("$parts[-1]", '|');
+      $last=~s/\s+$//;
+      my %data_spec = $self->parse_data_spec(pop @parts);
+      my $return = join('', @parts, $last);
+      foreach my $filter (@{$data_spec{filters}}) {
+        $return = $self->_apply_data_filter($return, $data, $filter);
+      }
+      return $return;
+    }
+
     return join('', @parts);
   } else {
     my %data_spec = $self->parse_data_spec($action_proto);
@@ -583,10 +597,15 @@ sub _process_mode {
     if($target eq 'node') {
       return $dom->remove;
     } elsif($target eq 'content') {
-      return $dom->remove; # TODO, or should this remove just the content..?
+      if( ($mode eq 'append') or ($mode eq 'prepend')) {
+        # Don't remove anything since there's not a target mode here
+        # just stuff we wanted to add to the start or end.
+        return;
+      } else {
+        return $dom->remove; # TODO, or should this remove just the content..?
+      }
     } elsif(my $attr = $$target) {
       return delete $dom->attr->{$attr};
-
     }
   }
 

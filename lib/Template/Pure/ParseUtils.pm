@@ -29,6 +29,12 @@ sub parse_itr_spec {
   return $key => +{ parse_data_spec($data_spec) };
 }
 
+{
+  package Template::Pure::Literal;
+  use overload
+    '""' => sub { my $self = shift; return ${$self} };  
+}
+
 sub parse_data_template {
   my ($spec) = @_;
   $spec=~s/\r|\n//gs; # cleanup newlines.
@@ -53,7 +59,7 @@ sub parse_data_template {
     if(my ($is_data_spec) = ($part=~/^$opentag(.+?)$closetag$/)) {
       push @parts, +{ parse_data_spec($is_data_spec) };
     } else {
-      push @parts, $part;
+      push @parts, bless \$part, 'Template::Pure::Literal';
     }
   }
   return @parts;
@@ -78,6 +84,13 @@ sub parse_data_spec {
   my ($path_proto, @filters_proto) = 
     grep { length($_) > 0 } 
       map { $_=~s/^\s+|\s+$//g; $_ } @parts;
+
+  #Special case: If you have a part that is " |filter" we need to
+  #munge a bit.
+  if($parts[0] eq '') {
+    push @filters_proto, $path_proto;
+    $path_proto = '';
+  }
 
   my @path_proto = split(/\.|\//, $path_proto);
 

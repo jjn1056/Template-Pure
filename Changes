@@ -1,5 +1,12 @@
 The following logs changes for the CPAN distribution Template::Pure
 
+0.020   TBA
+        - Bugfixes for object iterator
+        - When the matchspec is 'append' or 'prepend' and the target action
+          is undef we no longer delete the matched node.
+        - If an action with a template that contains literals and placeholders
+          has a trailing filter(s) we now apply the filters.
+
 0.019   07 July 2016
         - You may now use a data placeholder in a match specification
         - You may now pass a coderef to replace a match => action pair

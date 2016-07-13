@@ -35,10 +35,10 @@ sub from_object {
     return bless +{
       _index => sub { return $index },
       _current_value => sub { return $current },
-      _max_index => sub { return $count->() - 1 },
-      _count => sub { return $count->() },
+      _max_index => sub { return $obj->$count - 1 },
+      _count => sub { return $obj->$count },
       _next => sub {
-        if(my $next = $next->()) {
+        if(my $next = $obj->$next) {
           $current = $next;
           $index++;
           return $next;
@@ -46,17 +46,17 @@ sub from_object {
           return undef;
         }
       },
-      _reset => sub { $reset->() },
-      _all => sub { return $all->() },
+      _reset => sub { $reset->($obj) },
+      _all => sub { return $all->($obj) },
       _is_first => sub { return (($index - 1) == 0 ? 1:0) },
-      _is_last => sub { return $index == $count->() ? 1:0 },
+      _is_last => sub { return $index == $count->($obj) ? 1:0 },
       _is_even => sub { return $index % 2 ? 0:1 },
       _is_odd => sub { return $index % 2 ? 1:0 },
     }, $class;
   } else {
     my %hash;
     if(my $fields = $obj->can($options->{fields_method} ||'display_fields')) {
-      %hash = map { $_ => $obj->$_ } ($fields->());
+      %hash = map { $_ => $obj->$_ } ($fields->($obj));
     } else {
       %hash =  %{$obj};
     }

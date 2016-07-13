@@ -12,7 +12,8 @@ ok my $html = q[
       <ol>
         <li>stuff</li>
       </ol>
-      <div>End Stuff</div>
+      <div id="end">End Stuff</div>
+      <div id="append_prepend">vvv</div>
     </body>
   </html>
 ];
@@ -22,7 +23,13 @@ ok my $pure = Template::Pure->new(
   directives=> [
     'title' => 'settings.maybe:defaults.title',
     'body h1' => 'title',
-    'body div' => 'optional:foot',
+    'body div#end' => 'optional:foot',
+    '#append_prepend+' => 'nothing',
+    '+#append_prepend' => 'nothing',
+    '#append_prepend' => [
+      '.+' => 'nothing',
+      '+.' => 'nothing',
+    ],
     'ol li' => {
       'person<-people' => [
         '.' => '={person} ={i.index}',
@@ -38,15 +45,15 @@ ok my $data = +{
   },
   title => undef,
   people => undef,
+  nothing => undef,
 };
 
 ok my $string = $pure->render($data);
 ok my $dom = Mojo::DOM58->new($string);
 
-#warn $string;
-
 ok !$dom->at('title');
 ok !$dom->at('ol li');
-ok !$dom->at('body div');
+ok !$dom->at('body div#end');
+ok $dom->at('#append_prepend')->content, 'vvv';
 
 done_testing; 
