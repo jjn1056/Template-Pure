@@ -41,12 +41,12 @@ ok my $story = Template::Pure->new(
   ]);
 
 ok my $foot_html = qq[
-  <span id="time">current time</span>];
+  <span class="time">current time: </span>];
 
 ok my $foot = Template::Pure->new(
   template=>$foot_html,
   directives=> [
-    '#time' => 'time',
+    '.time+' => 'time',
   ]);
 
 ok my $base_html = q[
@@ -67,6 +67,7 @@ ok my $base_html = q[
       <?pure-wrapper src='lib.story' ctx='meta'?>
       <div id='story'>Example Story</div>
       <?pure-include src='lib.foot' ctx='meta'?>
+      <?pure-include src='lib.foot' time='meta.time'?>
     </body>
   </html>
 ];
@@ -98,7 +99,8 @@ is $dom->at('title')->content, 'Page Title: My Title';
 is $dom->at('section #story')->content, 'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX';
 is $dom->at('section p')->content, 'By jnap';
 is $dom->at('section h1')->content, 'My Title';
-ok $dom->at('#time')->content;
+like $dom->find('.time')->[0]->content, qr'current time:';
+like $dom->find('.time')->[0]->content, qr'current time:';
 is $dom->at('#foot')->content, 'Here&#39;s the footer';
 is $dom->find('link')->[0]->attr('href'), '/css/pure-min.css';
 is $dom->find('script')->[0]->attr('src'), '/js/3rd-party/angular.min.js';
@@ -106,6 +108,8 @@ like $dom->find('script')->[2]->content, qr'function';
 like $dom->find('script')->[2]->content, qr'return baz';
 
 done_testing;
+
+#warn $string;
 
 __END__
 

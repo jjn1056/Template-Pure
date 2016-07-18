@@ -3,7 +3,7 @@ use warnings;
 
 package Template::Pure;
 
-our $VERSION = '0.020';
+our $VERSION = '0.021';
 
 use Mojo::DOM58;
 use Scalar::Util;
@@ -50,7 +50,14 @@ sub _process_pi {
       @include_directives = ("#include-$params{cnt}" => +{ $ctx => ['^.' => "/$src"]});
     } elsif(%attrs) {
       $attrs{$src} = "/$src";
-      @include_directives = ("#include-$params{cnt}" => [\%attrs, '^.' => "$src"]);
+      @include_directives = (
+        "#include-$params{cnt}" => [
+          \%attrs, 
+          '^.' => sub {
+            my ($t, $dom, $data) = @_;
+            return $data->{$src};
+          },
+        ]);
     } else {
       @include_directives = ("^#include-$params{cnt}", $src)
     }

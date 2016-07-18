@@ -1,5 +1,9 @@
 The following logs changes for the CPAN distribution Template::Pure
 
+0.021   18 July 2016
+        - Fixed processing instruction include when listing arguments
+        - Updated some dependency requirements
+
 0.020   13 July 2016
         - Bugfixes for object iterator
         - When the matchspec is 'append' or 'prepend' and the target action
