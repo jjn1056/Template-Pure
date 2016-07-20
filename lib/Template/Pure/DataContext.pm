@@ -33,7 +33,24 @@ sub at {
       } elsif($at->{optional}) {
         $current = undef;
       } else {
-        die "Missing path '$key' in data context ". Dumper($current);
+        if($current->isa('Template::Pure::DataProxy')) {
+          eval { require Class::MOP::Class } || die "Missing path '$key' in data context ". Dumper($current);
+          my @paths =  ("--THIS CLASS--", map { $_ ."\t(hashkey)"} sort keys %{$current->{extra}});
+          my @methods =  Class::MOP::Class->initialize(ref $current->{data})->get_method_list;
+          push @paths, map { $_ ."\t(". ref($current->{data}) . ")" } map { ref $_ ? $_->name : $_ } sort @methods;
+          my @all = Class::MOP::Class->initialize(ref $current->{data})->get_all_methods;
+          push @paths, '---ALL CLASSES---' if @all;
+          push @paths, map { $_->name ."\t(". $_->package_name .")" } sort @all if @all;
+          die "Missing path '$key' in object ". ref($current) .", available:\n".join '', map { "\t$_\n"} grep { $_ ne 'new' } @paths;        
+        } else {
+          eval { require Class::MOP::Class } || die "Missing path '$key' in data context ". Dumper($current);
+          my @paths;
+          my @methods =  Class::MOP::Class->initialize(ref $current)->get_method_list;
+          push @paths, map { ref $_ ? $_->name : $_ } '---THIS CLASS---', @methods;
+          my @all = Class::MOP::Class->initialize(ref $current)->get_all_method_names;
+          push @paths, map { ref $_ ? $_->name : $_ } '---ALL CLASSES---', @all if @all;
+          die "Missing path '$key' in object ". ref($current) .", available:\n".join ',', map { "\t$_\n"} grep { $_ ne 'new' } @paths;
+        }
       }
     } elsif(ref $current eq 'HASH') {
       if(exists $current->{$key}) {
@@ -41,8 +58,8 @@ sub at {
       } elsif($at->{optional}) {
         $current = undef;
       } else {
-        warn Dumper $at;
-        die "Missing path '$key'";
+        my @paths =  keys %{$current};
+         die "Missing path '$key' in Hashref, available:\n".join ',', map { "\t$_\n"} @paths;
       }
     } else {
       die "Can't find path '$key' in ". Dumper $current;
@@ -55,4 +72,3 @@ sub at {
 }
 
 1;
-

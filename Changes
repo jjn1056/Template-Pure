@@ -1,5 +1,10 @@
 The following logs changes for the CPAN distribution Template::Pure
 
+0.022   20 July 2016
+        - Some error messages around missing data paths are now more useful. Requires
+          Class::MOP (which is not listed as a dependency, you should install it for
+          debugging in development).
+<D-d>
 0.021   18 July 2016
         - Fixed processing instruction include when listing arguments
         - Updated some dependency requirements

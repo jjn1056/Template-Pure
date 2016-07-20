@@ -3,7 +3,7 @@ use warnings;
 
 package Template::Pure;
 
-our $VERSION = '0.021';
+our $VERSION = '0.022';
 
 use Mojo::DOM58;
 use Scalar::Util;
@@ -2642,6 +2642,13 @@ and can overlay sections for those cases where a L</Wrapper> is not sufficently 
 Please note that L<Mojo::DOM58> tends to enforce rule regarding valid HTML5.  For example, you
 cannot nest a block level element inside a 'P' element.  This might at time lead to some
 surprising results in your output.
+
+=head1 ERROR MESSAGES AND DEBUGGING
+
+Some error messages will use L<Class::MOP> if its available for introspection.  Having this installed
+will greatly improve your debugging, so I recommend installing it on your development machines (good
+change you already have it via L<Moose> anyway).  If its not installed we just do a general L<Data::Dumper>
+which results in a lot of data that is not easy to read, but suitable for production.
 
 =head1 AUTHOR
  
