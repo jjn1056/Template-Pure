@@ -38,6 +38,7 @@ ok my $story = Template::Pure->new(
     'h1' => 'title',
     '^p+' => 'content',
     'p+' => 'author',
+    '#story+' => 'author',
   ]);
 
 ok my $foot_html = qq[
@@ -68,6 +69,8 @@ ok my $base_html = q[
       <div id='story'>Example Story</div>
       <?pure-include src='lib.foot' ctx='meta'?>
       <?pure-include src='lib.foot' time='meta.time'?>
+      <?pure-filter src='lib.filter' class='meta.class' ?>
+      <a href="aaa">Hi</a>
     </body>
   </html>
 ];
@@ -85,18 +88,29 @@ ok my $string = $base->render({
     title=>'My Title',
     author=>'jnap',
     time => scalar(localtime),
+    class => 'blue',
   },
+  class => 'red',
   lib => {
     foot => $foot,
     story => $story,
     overlay => $overlay,
+    filter => sub {
+      my $template = shift;
+      return Template::Pure->new(
+        template => $template,
+        directives => [
+        'a@class' => 'class',
+        ]
+      );
+    },
   }
 });
 
 ok my $dom = Mojo::DOM58->new($string);
 
 is $dom->at('title')->content, 'Page Title: My Title';
-is $dom->at('section #story')->content, 'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX';
+is $dom->at('section #story')->content, 'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXjnap';
 is $dom->at('section p')->content, 'By jnap';
 is $dom->at('section h1')->content, 'My Title';
 like $dom->find('.time')->[0]->content, qr'current time:';
@@ -106,40 +120,7 @@ is $dom->find('link')->[0]->attr('href'), '/css/pure-min.css';
 is $dom->find('script')->[0]->attr('src'), '/js/3rd-party/angular.min.js';
 like $dom->find('script')->[2]->content, qr'function';
 like $dom->find('script')->[2]->content, qr'return baz';
+is $dom->find('a.blue')->[0]->attr('href'), 'aaa';
 
 done_testing;
-
 #warn $string;
-
-__END__
-
-output like:
-
-  <html>
-    <head>
-      <title>Page Title: My Title</title>
-      <link href="/css/pure-min.css" rel="stylesheet">
-        <link href="/css/grids-responsive-min.css" rel="stylesheet">
-          <link href="/css/common.css" rel="stylesheet">
-      <script src="/js/3rd-party/angular.min.js"></script>
-        <script src="/js/3rd-party/angular.resource.min.js"></script>
-          <script>
-            function foo(bar) {
-              return baz;
-            }
-          </script>
-      </head>
-    <body>
-      <section id="content"> 
-        <section>
-          <h1>story title</h1>
-          <p>By jnap</p>
-          <div id="story">
-            XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-          </div>
-        </section>
-        <span id="time">Mon Apr 25 16:49:55 2016</span>
-      </section>
-      <p id="foot">Here&#39;s the footer</p>
-    </body>
-  </html>

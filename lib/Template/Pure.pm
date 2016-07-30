@@ -3,7 +3,7 @@ use warnings;
 
 package Template::Pure;
 
-our $VERSION = '0.022';
+our $VERSION = '0.023';
 
 use Mojo::DOM58;
 use Scalar::Util;
@@ -76,10 +76,38 @@ sub _process_pi {
         "^*[data-pure-wrapper-id=wrapper-$params{cnt}]", [\%attrs, '^.' => "$src"],
         "*[data-pure-wrapper-id=wrapper-$params{cnt}]\@data-pure-wrapper-id", sub { undef },
       );
-    }else {
+    } else {
       push @{$params{directives}}, (
         "^*[data-pure-wrapper-id=wrapper-$params{cnt}]", $src,
         "*[data-pure-wrapper-id=wrapper-$params{cnt}]\@data-pure-wrapper-id", sub { undef },
+      );
+    }
+  } elsif($target eq 'pure-filter') {
+    $params{node}->following('*')->first->attr('data-pure-filter-id'=>"filter-$params{cnt}");
+    $params{node}->remove;
+    if($ctx) {
+      push @{$params{directives}}, (
+        "^*[data-pure-filter-id=filter-$params{cnt}]",  +{ $ctx => ['^.' => sub {
+          my ($t, $dom, $data) = @_;
+          $t->data_at_path($data, "/$src")->($dom);
+        } ]},
+        "*[data-pure-filter-id=filter-$params{cnt}]\@data-pure-filter-id", sub { undef },
+      );
+    } elsif(%attrs) {
+      push @{$params{directives}}, (
+        "^*[data-pure-filter-id=filter-$params{cnt}]", [\%attrs, '^.' => sub {
+          my ($t, $dom, $data) = @_;
+          $t->data_at_path($data, "/$src")->($dom);
+        } ],
+        "*[data-pure-filter-id=filter-$params{cnt}]\@data-pure-filter-id", sub { undef },
+      );
+    } else {
+      push @{$params{directives}}, (
+        "^*[data-pure-filter-id=filter-$params{cnt}]", sub {
+          my ($t, $dom, $data) = @_;
+          $t->data_at_path($data, $src)->($dom);
+        },
+        "*[data-pure-filter-id=filter-$params{cnt}]\@data-pure-filter-id", sub { undef },
       );
     }
   } elsif($target eq 'pure-overlay') {
@@ -762,11 +790,20 @@ Nevertheless its all working well enough that I'd like to publish it so I can st
 more widely and hopefully some of you will like what you see and be inspired to try and help
 close the gaps.
 
-B<NOTE> UPDATE: The code is starting to shape up and at this point I'm started to commit to
+B<NOTE> UPDATE (version 0.015): The code is starting to shape up and at this point I'm started to commit to
 things that pass the current test case should still pass in the future unless breaking changes
 are absolutely required to move the project forward. Main things to be worked out is if the
 rules around handling undef values and when we have an object as the loop iterator has not
 been as well tested as it should be.
+
+B<NOTE> UPDATE (version 0.023): Error messaging is tremendously improved and a number of edge case
+issues have worked out while working on the Catalyst View adaptor (not on CPAN at the time of this
+writing).  Main blockers before I can consider this stable include lots of performance tuning,
+completion of a working Catalyst view adaptor, and refactoring of the way we use the L<Mojo::DOM58>
+parser so that parsers are plugable.  I also need to refactor how processing instructions are
+handled so that its not a pile of inlined code (ideally you should be able to write your own
+processing instructions).  I feel commited to the existing test suite and documented
+API.
 
 L<Template::Pure> HTML/XML Templating system, inspired by pure.js L<http://beebole.com/pure/>, with
 some additions and modifications to make it more Perlish and to be more suitable
@@ -2280,7 +2317,7 @@ B<NOTE> All processing instructions are parsed and evaluated during instantiatio
 template object and all generated directives are adding to the end of your existing ones.  As
 a result these instructions are run last.
 
-=head1 Includes
+=head2 Includes
 
 Allows one to inject a template render into a placeholder spot in the current template.  Example:
 
@@ -2637,10 +2674,70 @@ not limited to that, rather like the L</Wrapper> processing instruction it just 
 tag node following as its overlay target.  So you could have more than one overlap in a document
 and can overlay sections for those cases where a L</Wrapper> is not sufficently complex.
 
+=head2 Filter
+
+A Filter will process the following node on a L<Template::Pure> instance as if that node was the
+source for its template.  This means that the target source template must be a coderef that builds
+a <Template::Pure> object, and not an already instantiated one.  For Example:
+
+    my $base_html = q[
+      <html>
+        <head>
+          <title>Title Goes Here...</title>
+        </head>
+        <body>
+          <?pure-filter src=?>
+          <ul>
+            <li>One</li>
+            <li>Two</li>
+            <li>Three</li>
+          </ul>
+        </body>
+      </html>
+    ];
+
+    my $base = Template::Pure->new(
+      template => $base_html,
+      directives => [
+        'title' => 'title',
+      ]
+    );
+
+    print $base->render({
+      title => 'Dark and Stormy..',
+      style => 'red',
+      filter => sub {
+        my $dom = shift;
+        return Template::Pure->new(
+          template => $dom,
+          directives => [
+            'li@class' => 'style'
+          ]
+      },
+    });
+
+Outputs:
+
+    <html>
+      <head>
+        <title>Dark and Stormy..</title>
+      </head>
+      <body>
+        <ul>
+          <li class='red'>One</li>
+          <li class='red'>Two</li>
+          <li class='red'>Three</li>
+        </ul>
+      </body>
+    </html>
+
+As you can see, its similar to the Wrapper instruction, just instead of the matched template
+being passed as the 'content' argument to be used in anther template, it becomes the template.
+
 =head1 IMPORTANT NOTE REGARDING VALID HTML
 
 Please note that L<Mojo::DOM58> tends to enforce rule regarding valid HTML5.  For example, you
-cannot nest a block level element inside a 'P' element.  This might at time lead to some
+cannot nest a block level element inside a 'P' element.  This might at times lead to some
 surprising results in your output.
 
 =head1 ERROR MESSAGES AND DEBUGGING

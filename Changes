@@ -1,10 +1,17 @@
 The following logs changes for the CPAN distribution Template::Pure
 
+0.023   29 July 2016
+        - New Processing Instruction: Filter.  Takes a node as its source template.
+        - I no longer consider this module a wild alpha version.  I will only break
+          the existing test suite and documented behavior if I have obsolutely not
+          other path forward.  See main docs for blockers on removing 'early access'
+          status.
+
 0.022   20 July 2016
         - Some error messages around missing data paths are now more useful. Requires
           Class::MOP (which is not listed as a dependency, you should install it for
           debugging in development).
-<D-d>
+
 0.021   18 July 2016
         - Fixed processing instruction include when listing arguments
         - Updated some dependency requirements
