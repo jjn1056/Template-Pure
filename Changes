@@ -1,5 +1,9 @@
 The following logs changes for the CPAN distribution Template::Pure
 
+0.024   08 August 2016
+        - Regexp patch to silence warnings (zostay++)
+        - Allow one to indicate an action is a literal string
+
 0.023   29 July 2016
         - New Processing Instruction: Filter.  Takes a node as its source template.
         - I no longer consider this module a wild alpha version.  I will only break

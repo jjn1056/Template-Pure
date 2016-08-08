@@ -92,6 +92,21 @@ Nevertheless its all working well enough that I'd like to publish it so I can st
 more widely and hopefully some of you will like what you see and be inspired to try and help
 close the gaps.
 
+**NOTE** UPDATE (version 0.015): The code is starting to shape up and at this point I'm started to commit to
+things that pass the current test case should still pass in the future unless breaking changes
+are absolutely required to move the project forward. Main things to be worked out is if the
+rules around handling undef values and when we have an object as the loop iterator has not
+been as well tested as it should be.
+
+**NOTE** UPDATE (version 0.023): Error messaging is tremendously improved and a number of edge case
+issues have worked out while working on the Catalyst View adaptor (not on CPAN at the time of this
+writing).  Main blockers before I can consider this stable include lots of performance tuning,
+completion of a working Catalyst view adaptor, and refactoring of the way we use the [Mojo::DOM58](https://metacpan.org/pod/Mojo::DOM58)
+parser so that parsers are plugable.  I also need to refactor how processing instructions are
+handled so that its not a pile of inlined code (ideally you should be able to write your own
+processing instructions).  I feel commited to the existing test suite and documented
+API.
+
 [Template::Pure](https://metacpan.org/pod/Template::Pure) HTML/XML Templating system, inspired by pure.js [http://beebole.com/pure/](http://beebole.com/pure/), with
 some additions and modifications to make it more Perlish and to be more suitable
 as a server side templating framework for larger scale needs instead of single page
@@ -405,6 +420,56 @@ $data in helper objects, so you can't be 100% certain of the actual structure.  
 using this method wouldbe a good idea anyway since it lets you achieve an API that is
 complete independent of your actual data structure (this way if you later change from a 
 simple hashref to an object, your code wouldn't break.
+
+### Coderef - No match specification
+
+Sometimes you may wish to have highly customized transformations, ones that are
+not directly attached to a match specification.  In those cases you may pass a
+match specification without a CSS match:
+
+    my $html = q[
+      <html>
+        <head>
+          <title>Page Title</title>
+        </head>
+        <body>
+          <p>foo</p>
+          <p>baz</p>
+          <div id="111"></div>
+        </body>
+      </html>
+    ];
+
+    my $pure = Template::Pure->new(
+      template=>$html,
+      directives=> [
+        sub {
+          my ($template, $dom, $data) = @_;
+          $dom->at('#111')->content("coderef");
+        },
+        'p' => sub {
+          my ($template, $dom, $data) = @_;
+          return $template->data_at_path($data, $dom->content)
+        }
+      ]);
+
+    my $data = +{
+      foo => 'foo is you',
+      baz => 'baz is raz',
+    };
+
+Renders as:
+
+    <html>
+      <head>
+        <title>Page Title</title>
+      </head>
+      <body>
+        <p>foo is you</p>
+        <p>baz is raz</p>
+        <div id="111">coderef</div>
+      </body>
+    </html>
 
 ## Arrayref - Run directives under a new DOM root
 
@@ -1189,6 +1254,55 @@ path as undefined:
       ...,
     ],
 
+## Using a Literal Value in your Directive Action
+
+Generally the action part of your directive will be a path that maps to
+a section of the data that is passed to the template at render.  However
+there can be some cases when its useful to indicate a literal value, particularly
+doing template development when you might not have written all the backend code
+that generates data.  In those cases you may indicate that the action is a
+string literal using single or double quotes as in the following example:
+
+    my $html = q[
+      <html>
+        <head>
+          <title>Page Title</title>
+        </head>
+        <body>
+          <p id="literal_q">aaa</a>
+          <p id="literal_qq">bbb</a>
+        </body>
+      </html>
+    ];
+
+    my $pure = Template::Pure->new(
+      template=>$html,
+      directives=> [
+        title=>'title',
+        '#literal_q' => "'literal data single quote'",
+        '#literal_qq' => '"literal data double quote"',
+
+      ]);
+
+    my $data = +{
+      title => 'A Shadow Over Innsmouth',
+    };
+
+Returns on processing:
+
+    <html>
+      <head>
+        <title>A Shadow Over Innsmouth</title>
+      </head>
+      <body>
+        <p id="literal_q">literal data single quote'</a>
+        <p id="literal_qq">literal data double quote</a>
+      </body>
+    </html>
+
+This feature is of limited value since at this time there is no way to indicate
+a literal other than a string.
+
 ## Defaults in your Data Context
 
 By default there will be a key 'self' in your data context which refers to
@@ -1265,6 +1379,9 @@ and to modify the DOM, you can return a CODEREF:
         };
       }
     }
+
+Such a coderef may return a scalar value, an object or any other type of
+data type we can process.
 
 ## Remapping Your Data Context
 
@@ -1343,7 +1460,41 @@ paths can be simple or complex, and even contain filters:
 
 For more on filters see ["FILTERS"](#filters)
 
-## Special indicators in your match.
+## Using Placeholders in your Match Specification
+
+Sometimes you may wish to allow the user that is rendering a template the
+ability to influence the match specification.  To grant this ability you
+may use a placeholder:
+
+    my $html = q[
+      <html>
+        <head>
+          <title>Page Title</title>
+        </head>
+        <body>
+          <p id="story">Some Stuff</p>
+          <p id="footer">...</p>
+        </body>
+      </html>
+    ];
+
+    my $pure = Template::Pure->new(
+      template=>$html,
+      directives=> [
+        'body ={story_target}' => '={meta.title | upper}: ={story} on ={meta.date}',
+        '#footer' => '={meta.title} on ={meta.date}',
+    ]);
+
+    my $data = +{
+      story_target => '#story',
+      meta => {
+        title => 'Inner Stuff',
+        date => '1/1/2020',
+      },
+      story => 'XX' x 10,
+    };
+
+## Special indicators in your Match Specification
 
 In General your match specification is a CSS match supported by the
 underlying HTML parser.  However the following specials are supported
@@ -1495,7 +1646,7 @@ yet offer an API to create your own.  This may change in the future.
 template object and all generated directives are adding to the end of your existing ones.  As
 a result these instructions are run last.
 
-# Includes
+## Includes
 
 Allows one to inject a template render into a placeholder spot in the current template.  Example:
 
@@ -1852,11 +2003,78 @@ not limited to that, rather like the ["Wrapper"](#wrapper) processing instructio
 tag node following as its overlay target.  So you could have more than one overlap in a document
 and can overlay sections for those cases where a ["Wrapper"](#wrapper) is not sufficently complex.
 
+## Filter
+
+A Filter will process the following node on a [Template::Pure](https://metacpan.org/pod/Template::Pure) instance as if that node was the
+source for its template.  This means that the target source template must be a coderef that builds
+a <Template::Pure> object, and not an already instantiated one.  For Example:
+
+    my $base_html = q[
+      <html>
+        <head>
+          <title>Title Goes Here...</title>
+        </head>
+        <body>
+          <?pure-filter src=?>
+          <ul>
+            <li>One</li>
+            <li>Two</li>
+            <li>Three</li>
+          </ul>
+        </body>
+      </html>
+    ];
+
+    my $base = Template::Pure->new(
+      template => $base_html,
+      directives => [
+        'title' => 'title',
+      ]
+    );
+
+    print $base->render({
+      title => 'Dark and Stormy..',
+      style => 'red',
+      filter => sub {
+        my $dom = shift;
+        return Template::Pure->new(
+          template => $dom,
+          directives => [
+            'li@class' => 'style'
+          ]
+      },
+    });
+
+Outputs:
+
+    <html>
+      <head>
+        <title>Dark and Stormy..</title>
+      </head>
+      <body>
+        <ul>
+          <li class='red'>One</li>
+          <li class='red'>Two</li>
+          <li class='red'>Three</li>
+        </ul>
+      </body>
+    </html>
+
+As you can see, its similar to the Wrapper instruction, just instead of the matched template
+being passed as the 'content' argument to be used in anther template, it becomes the template.
+
 # IMPORTANT NOTE REGARDING VALID HTML
 
 Please note that [Mojo::DOM58](https://metacpan.org/pod/Mojo::DOM58) tends to enforce rule regarding valid HTML5.  For example, you
-cannot nest a block level element inside a 'P' element.  This might at time lead to some
+cannot nest a block level element inside a 'P' element.  This might at times lead to some
 surprising results in your output.
+
+# ERROR MESSAGES AND DEBUGGING
+
+Some error messages will use [Class::MOP](https://metacpan.org/pod/Class::MOP) if its available for introspection.  Having this installed
+will greatly improve your debugging, so I recommend installing it on your development machines (good
+change you already have it via [Moose](https://metacpan.org/pod/Moose) anyway).  If its not installed we just do a general [Data::Dumper](https://metacpan.org/pod/Data::Dumper)
+which results in a lot of data that is not easy to read, but suitable for production.
 
 # AUTHOR
 
@@ -1864,13 +2082,16 @@ John Napiorkowski [email:jjnapiork@cpan.org](email:jjnapiork@cpan.org)
 
 # SEE ALSO
 
-["Mojo::DOM58, [HTML::Zoom](https://metacpan.org/pod/HTML::Zoom).  Both of these are approaches to programmatically examining and
-altering a DOM."](#mojo-dom58-html-zoom-both-of-these-are-approaches-to-programmatically-examining-and-altering-a-dom)
+[Mojo::DOM58](https://metacpan.org/pod/Mojo::DOM58), [HTML::Zoom](https://metacpan.org/pod/HTML::Zoom).  Both of these are approaches to programmatically examining and
+altering a DOM.
 
 [Template::Semantic](https://metacpan.org/pod/Template::Semantic) is a similar system that uses XPATH instead of a CSS inspired matching
 specification.  It has more dependencies (including [XML::LibXML](https://metacpan.org/pod/XML::LibXML) and doesn't separate the actual
 template data from the directives.  You might find this more simple approach appealing, 
-so its worth a look.
+so its worth alook.
+
+[HTML::Seamstress](https://metacpan.org/pod/HTML::Seamstress) Seems to also be prior art along these lines but I have trouble following
+the code and it seems not active.  Might be worth looking at at least for ideas!
 
 # COPYRIGHT & LICENSE
 
@@ -1878,11 +2099,3 @@ Copyright 2016, John Napiorkowski [email:jjnapiork@cpan.org](email:jjnapiork@cpa
 
 This library is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.
-
-# POD ERRORS
-
-Hey! **The above document had some coding errors, which are explained below:**
-
-- Around line 2442:
-
-    Unterminated L<...> sequence

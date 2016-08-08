@@ -279,5 +279,18 @@ is_deeply itr('friend<-user.friends'), +{
   },
 };
 
- 
+is_deeply data("'literal data single quote'"), +{
+  absolute => '',
+  filters => [],
+  path => [],
+  literal => 'literal data single quote',
+};
+
+is_deeply data('"literal data double quote"'), +{
+  absolute => '',
+  filters => [],
+  path => [],
+  literal => 'literal data double quote',
+};
+
 done_testing;

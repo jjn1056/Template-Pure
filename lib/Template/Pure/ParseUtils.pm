@@ -67,6 +67,17 @@ sub parse_data_template {
 
 sub parse_data_spec {
   my $spec = shift;
+
+  # Is this a literal?
+  if(my ($value) = ($spec =~m/^[\'\"](.+)[\'\"]$/)) {
+    return (
+      literal => $value,
+      absolute => '',
+      path => [],
+      filters => [],
+    );
+  }
+
   $spec=~s/\r|\n//gs; # cleanup newlines.
   my $absolute = ($spec=~s[^\/][]);
 

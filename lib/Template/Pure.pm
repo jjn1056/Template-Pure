@@ -3,7 +3,7 @@ use warnings;
 
 package Template::Pure;
 
-our $VERSION = '0.023';
+our $VERSION = '0.024';
 
 use Mojo::DOM58;
 use Scalar::Util;
@@ -387,6 +387,7 @@ sub _value_from_scalar_action {
       ref $_ eq 'HASH' ? $self->_value_from_data($data, %$_) : $_; 
     } $self->parse_data_template($action_proto);
 
+
     # If the last part is a literal AND it has trailing filters
     # we need to process the filters.  And deal with all the special cases...
     if(Scalar::Util::blessed $parts[-1] and index("$parts[-1]", '|')) {
@@ -399,11 +400,14 @@ sub _value_from_scalar_action {
       }
       return $return;
     }
-
     return join('', @parts);
   } else {
     my %data_spec = $self->parse_data_spec($action_proto);
-    return $self->_value_from_data($data, %data_spec);
+    if(defined(my $literal = $data_spec{literal})) {
+      return $literal;
+    } else {
+      return $self->_value_from_data($data, %data_spec);
+    }
   }
 }
 
@@ -1969,6 +1973,55 @@ path as undefined:
       'copyright => 'meta.maybe:license_info.copyright_date',
       ...,
     ],
+
+=head2 Using a Literal Value in your Directive Action
+
+Generally the action part of your directive will be a path that maps to
+a section of the data that is passed to the template at render.  However
+there can be some cases when its useful to indicate a literal value, particularly
+doing template development when you might not have written all the backend code
+that generates data.  In those cases you may indicate that the action is a
+string literal using single or double quotes as in the following example:
+
+    my $html = q[
+      <html>
+        <head>
+          <title>Page Title</title>
+        </head>
+        <body>
+          <p id="literal_q">aaa</a>
+          <p id="literal_qq">bbb</a>
+        </body>
+      </html>
+    ];
+
+    my $pure = Template::Pure->new(
+      template=>$html,
+      directives=> [
+        title=>'title',
+        '#literal_q' => "'literal data single quote'",
+        '#literal_qq' => '"literal data double quote"',
+
+      ]);
+
+    my $data = +{
+      title => 'A Shadow Over Innsmouth',
+    };
+
+Returns on processing:
+
+    <html>
+      <head>
+        <title>A Shadow Over Innsmouth</title>
+      </head>
+      <body>
+        <p id="literal_q">literal data single quote'</a>
+        <p id="literal_qq">literal data double quote</a>
+      </body>
+    </html>
+
+This feature is of limited value since at this time there is no way to indicate
+a literal other than a string.
 
 =head2 Defaults in your Data Context
 
