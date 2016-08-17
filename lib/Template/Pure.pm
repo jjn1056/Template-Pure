@@ -3,7 +3,7 @@ use warnings;
 
 package Template::Pure;
 
-our $VERSION = '0.024';
+our $VERSION = '0.025';
 
 use Mojo::DOM58;
 use Scalar::Util;
@@ -138,6 +138,7 @@ sub _process_components {
     %{$params{node}->attr||+{}},
     parent => $params{component_current_parent}[-1]||undef,
     node => $params{node},
+    container => $self,
   );
 
   my $component_id = $params{component_name}.'-'.$params{cnt};

@@ -34,16 +34,20 @@ sub at {
         $current = undef;
       } else {
         if($current->isa('Template::Pure::DataProxy')) {
-          eval { require Class::MOP::Class } || die "Missing path '$key' in data context ". Dumper($current);
+          eval "use Moose (); 1" || die "Missing path '$key' in data context ". Dumper($current);
           my @paths =  ("--THIS CLASS--", map { $_ ."\t(hashkey)"} sort keys %{$current->{extra}});
           my @methods =  Class::MOP::Class->initialize(ref $current->{data})->get_method_list;
           push @paths, map { $_ ."\t(". ref($current->{data}) . ")" } map { ref $_ ? $_->name : $_ } sort @methods;
           my @all = Class::MOP::Class->initialize(ref $current->{data})->get_all_methods;
           push @paths, '---ALL CLASSES---' if @all;
-          push @paths, map { $_->name ."\t(". $_->package_name .")" } sort @all if @all;
+          push @paths,
+            map { $_->name ."\t(". $_->package_name .")" }
+            grep { $_->package_name ne 'UNIVERSAL' }
+            sort @all if @all;
+
           die "Missing path '$key' in object ". ref($current) .", available:\n".join '', map { "\t$_\n"} grep { $_ ne 'new' } @paths;        
         } else {
-          eval { require Class::MOP::Class } || die "Missing path '$key' in data context ". Dumper($current);
+          eval "use Moose (); 1" || die "Missing path '$key' in data context ". Dumper($current);
           my @paths;
           my @methods =  Class::MOP::Class->initialize(ref $current)->get_method_list;
           push @paths, map { ref $_ ? $_->name : $_ } '---THIS CLASS---', @methods;

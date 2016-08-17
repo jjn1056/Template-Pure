@@ -12,6 +12,7 @@ sub inner {
     $self->{node}->content);
 }
 
+sub container { $_[0]->{container} }
 sub parent { shift->{parent} }
 sub children { @{shift->{children}} }
 sub add_child {

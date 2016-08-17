@@ -1,5 +1,10 @@
 The following logs changes for the CPAN distribution Template::Pure
 
+0.025   17 Augst 2016
+        - Updated dependencies
+        - fixed typo in code that does error messages.  Should improve messaging.
+        - More undocumented work on components / custom tags
+
 0.024   08 August 2016
         - Regexp patch to silence warnings (zostay++)
         - Allow one to indicate an action is a literal string
