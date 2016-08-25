@@ -36,8 +36,17 @@ sub at {
         if($current->isa('Template::Pure::DataProxy')) {
           eval "use Moose (); 1" || die "Missing path '$key' in data context ". Dumper($current);
           my @paths =  ("--THIS CLASS--", map { $_ ."\t(hashkey)"} sort keys %{$current->{extra}});
-          my @methods =  Class::MOP::Class->initialize(ref $current->{data})->get_method_list;
-          push @paths, map { $_ ."\t(". ref($current->{data}) . ")" } map { ref $_ ? $_->name : $_ } sort @methods;
+          if(ref $current->{data} eq 'HASH') {
+            push @paths, map { "$_\t(hashkey)" } sort keys %{$current->{data}};
+          } else {
+            # Assume its an object
+            my @methods =  Class::MOP::Class->initialize(ref $current->{data})->get_method_list;
+            push @paths, map {
+              $_ ."\t(". ref($current->{data}) . ")";
+            } map {
+              ref $_ ? $_->name : $_;
+              } sort @methods;
+          }
           my @all = Class::MOP::Class->initialize(ref $current->{data})->get_all_methods;
           push @paths, '---ALL CLASSES---' if @all;
           push @paths,

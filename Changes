@@ -1,6 +1,16 @@
 The following logs changes for the CPAN distribution Template::Pure
 
-0.025   17 Augst 2016
+0.026   25 August 2016
+        - Fixed bug where in a loop and using a prepend or append match specification
+          the values aggregate rather than replace.
+        - Allow a new shorthand syntax in a loop when you are just doing a simple
+          one value replacement of the current matched node.
+        - Allow you to set the current data context directly in a loop 
+        - More tests to stress loops inside of loops.
+        - Minor improvements to error warnings
+        - POD fixes
+
+0.025   17 August 2016
         - Updated dependencies
         - fixed typo in code that does error messages.  Should improve messaging.
         - More undocumented work on components / custom tags

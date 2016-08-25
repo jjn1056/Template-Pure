@@ -59,7 +59,10 @@ ok my $dom = Mojo::DOM58->new($string);
 is $dom->find('ul li')->[0]->content, '<span>john</span>extra stuff';
 is $dom->find('ul li')->[1]->content, '<span>jack</span>extra stuff';
 is $dom->find('ul li')->[2]->content, '<span>jane</span>extra stuff';
+ok !$dom->find('ul li')->[3];
+
 is $dom->find('ol li')->[0]->content, 'JANEJANEJA 1';
 is $dom->find('ol li')->[1]->content, 'JACKJACKJA 2';
+ok !$dom->find('ol li')->[3];
 
 done_testing; 

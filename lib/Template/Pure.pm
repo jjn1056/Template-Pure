@@ -3,7 +3,7 @@ use warnings;
 
 package Template::Pure;
 
-our $VERSION = '0.025';
+our $VERSION = '0.026';
 
 use Mojo::DOM58;
 use Scalar::Util;
@@ -472,6 +472,10 @@ sub _process_sub_data {
 
   if(index($sub_data_proto,'<-') > 0) {
 
+    if(ref \$sub_data_action eq 'SCALAR') {
+      $sub_data_action = [ '.' => $sub_data_action ];
+    }
+
     die "Action for '$sub_data_proto' must be an arrayref of new directives"
       unless ref $sub_data_action eq 'ARRAY';
 
@@ -525,17 +529,24 @@ sub _process_sub_data {
 }
 
 sub _process_iterator {
-  my ($self, $dom, $key, $iterator, @actions) = @_; 
-  my $new_dom = Mojo::DOM58->new($dom);
+  my ($self, $dom, $key, $iterator, @actions) = @_;
+  my $template = dclone($dom);
   while(my $datum = $iterator->next) {
-    my $new_data = +{
-      $key => $datum, 
-      i => $iterator,
-    };
+    my $new_dom = Mojo::DOM58->new($template);
+    my $new_data;
+    if($key eq '.') {
+      $new_data = Template::Pure::DataProxy
+        ->new($datum, i=>$iterator);
+    } else {
+      $new_data = +{
+        $key => $datum, 
+        i => $iterator,
+      };
+    }
     $self->_process_dom_recursive($new_data, $new_dom->descendant_nodes->[0], @actions);
-    $dom->replace($new_dom); #Not sure why this is actually working....
-    #$iterator->is_first ? $dom->replace($new_dom) : $dom->append($new_dom);
+    $dom->replace($new_dom);
   }
+  $dom->remove;
 }
 
 sub process_sub_directives {
@@ -989,7 +1000,7 @@ For example:
         'section' => 'content',
       ]);
 
-    my $template = qq[
+    my $template => qq[
      <html>
         <head>
           <title>Title Goes Here!</title>
@@ -1051,7 +1062,7 @@ value in the current template:
     ];
 
     my $pure = Template::Pure->new(
-      template = $html,
+      template => $html,
       directives => [
         'h1#title' => \'/title',
       ]);
@@ -1198,7 +1209,7 @@ Somtimes its handy to group a set of directives under a given node.  For example
     ];
 
     my $pure = Template::Pure->new(
-      template = $html,
+      template => $html,
       directives => [
         '#contact' => [
           '.phone' => 'contact.phone',
@@ -1539,7 +1550,7 @@ and hashrefs this is simple:
     ];
 
     my $pure = Template::Pure->new(
-      template = $html,
+      template => $html,
       directives => [
         '#name' => {
           'name<-names' => [
@@ -1641,6 +1652,79 @@ an alternative method:
         },
       ]
 
+=head3 Setting the Data Context in the Interator Specification
+
+In order to simplify usage of the iterator, you may set the current data
+context directly in the interator specification.  In order to do this you
+would set the  target iterator variable name to '.' as in the following example:
+
+    my $html = qq[
+      <ol>
+        <li>
+          <span class='priority'>high|medium|low</span>
+          <span class='title'>title</span>
+        </li>
+      </ol>
+    ];
+
+    my $pure = Template::Pure->new(
+      template => $html,
+      directives => [
+        'ol li' => {
+          '.<-tasks' => [
+            '.priority' => 'priority',
+            '.title' => 'title',
+          ],
+        },
+      ]);
+
+    my %data = (
+      tasks => [
+        { priority => 'high', title => 'Walk Dogs'},
+        { priority => 'medium', title => 'Buy Milk'},
+      ],
+    );
+
+Returns:
+
+      <ol>
+        <li>
+          <span class="priority">high</span>
+          <span class="title">Walk Dogs</span>
+        </li>
+        <li>
+          <span class="priority">medium</span>
+          <span class="title">Buy Milk</span>
+        </li>
+      </ol>
+
+=head3 Shortcuts on Loops
+
+If you are doing a simple loop where the match specification is the current
+match point in the DOM and you are doing a simple 'replace contents' you may
+use a scalar instead of an arrayref:
+
+    my $html = qq[
+      <ol>
+        <li>Things to Do...</li>
+      </ol>
+    ];
+
+    my $pure = Template::Pure->new(
+      template => $html,
+      directives => [
+        'ol li' => {
+          'task<-tasks' => 'task',
+        },
+      ]);
+
+    my %data = (
+      tasks => [
+        'Walk Dogs',
+        'Buy Milk',
+      ],
+    );
+
 =head2 Object - Set the match value to another Pure Template
 
     my $section_html = qq[
@@ -1651,7 +1735,7 @@ an alternative method:
     ];
 
     my $pure_section = Template::Pure->new(
-      template = $section_html,
+      template => $section_html,
       directives => [
         'h2' => 'title',
         'p' => 'story'
@@ -1662,7 +1746,7 @@ an alternative method:
     ];
 
     my $pure = Template::Pure->new(
-      template = $html,
+      template => $html,
       directives => [
         'div.story' => $pure_section,
       ]);
@@ -1699,7 +1783,7 @@ to the L<Template> WRAPPER directive).
     ];
 
     my $wrapper = Template::Pure->new(
-      template = $wrapper_html,
+      template => $wrapper_html,
       directives => [
         'p.headline' => 'content',
       ]);
@@ -1710,7 +1794,7 @@ to the L<Template> WRAPPER directive).
     ];
 
     my $wrapper = Template::Pure->new(
-      template = $html,
+      template => $html,
       directives => [
         'div' => $wrapper,
       ]);
@@ -2122,7 +2206,7 @@ in some situations:
     ];
 
     my $pure = Template::Pure->new(
-      template = $html,
+      template => $html,
       directives => [
         '#contact' => [
           { 

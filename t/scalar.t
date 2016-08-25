@@ -25,7 +25,16 @@ ok my $html = qq[
         <p class="replace">append</p>
       </div>
       <div id='dom'>...
-      </dom>
+      </div>
+      <ul id='bug'>
+        <li>
+          <form action="/task/">
+          <ol>
+            <li>..</li>
+          </ol>
+          </form>
+        <li>
+      </div>
     </body>
   </html>
 ];
@@ -69,6 +78,14 @@ ok my $pure = Template::Pure->new(
     'body' => [
       'div#dom' => \'^/title',
     ],
+    '#bug > li' => {
+      'task<-tasks' => [
+        'form@action+' => 'task.id',
+        'ol li' => {
+          'in<-task.inner' => 'in',
+        },
+      ],
+    },
   ]
 );
 
@@ -77,6 +94,11 @@ ok $pure->{directives};
 ok $pure->{filters};
 
 ok my $data = +{
+  tasks => [
+    {id=>1, inner=>[1,2,3]},
+    {id=>2, inner=>[1,2,3]},
+    {id=>3, inner=>[1,2,3]},
+  ],
   meta => { title=>'doomed poem' },
   settings => { title_length => 6 },
   content => {
@@ -99,6 +121,8 @@ ok my $data = +{
 
 ok my $string = $pure->render($data);
 ok my $dom = Mojo::DOM58->new($string);
+
+#warn $string;
 
 is $dom->at('title')->content, 'DOO...';
 
@@ -138,6 +162,29 @@ is $dom->at('title')->content, 'DOO...';
 
 {
   is $dom->at('#dom')->content, '<title>DOO...</title>';
+}
+
+{
+  ok my $col = $dom->find('#bug > li');
+  is $col->[0]->at('form')->attr('action'), '/task/1';
+  is $col->[0]->find('ol li')->[0]->content, '1';
+  is $col->[0]->find('ol li')->[1]->content, '2';
+  is $col->[0]->find('ol li')->[2]->content, '3';
+  ok ! $col->[0]->find('ol li')->[3];
+  
+  is $col->[1]->at('form')->attr('action'), '/task/2';
+  is $col->[1]->find('ol li')->[0]->content, '1';
+  is $col->[1]->find('ol li')->[1]->content, '2';
+  is $col->[1]->find('ol li')->[2]->content, '3';
+  ok ! $col->[1]->find('ol li')->[3];
+
+  is $col->[2]->at('form')->attr('action'), '/task/3';
+  is $col->[2]->find('ol li')->[0]->content, '1';
+  is $col->[2]->find('ol li')->[1]->content, '2';
+  is $col->[2]->find('ol li')->[2]->content, '3';
+  ok ! $col->[2]->find('ol li')->[3];
+
+  ok ! $col->[3];
 }
 
 done_testing;
