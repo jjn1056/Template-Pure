@@ -1,5 +1,8 @@
 The following logs changes for the CPAN distribution Template::Pure
 
+0.027   TBD
+        -
+
 0.026   25 August 2016
         - Fixed bug where in a loop and using a prepend or append match specification
           the values aggregate rather than replace.

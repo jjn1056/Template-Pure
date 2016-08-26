@@ -3,7 +3,7 @@ use warnings;
 
 package Template::Pure;
 
-our $VERSION = '0.026';
+our $VERSION = '0.027';
 
 use Mojo::DOM58;
 use Scalar::Util;
@@ -388,10 +388,9 @@ sub _value_from_scalar_action {
       ref $_ eq 'HASH' ? $self->_value_from_data($data, %$_) : $_; 
     } $self->parse_data_template($action_proto);
 
-
     # If the last part is a literal AND it has trailing filters
     # we need to process the filters.  And deal with all the special cases...
-    if(Scalar::Util::blessed $parts[-1] and index("$parts[-1]", '|')) {
+    if(Scalar::Util::blessed($parts[-1]) && (index("$parts[-1]", '|') >0) ) {
       my $last = substr "$parts[-1]", 0, index("$parts[-1]", '|');
       $last=~s/\s+$//;
       my %data_spec = $self->parse_data_spec(pop @parts);
@@ -401,6 +400,7 @@ sub _value_from_scalar_action {
       }
       return $return;
     }
+    
     return join('', @parts);
   } else {
     my %data_spec = $self->parse_data_spec($action_proto);
