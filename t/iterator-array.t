@@ -65,6 +65,6 @@ is $dom->find('ol li')->[0]->content, 'JANEJANEJA 1';
 is $dom->find('ol li')->[1]->content, 'JACKJACKJA 2';
 ok !$dom->find('ol li')->[3];
 
-warn $string; 
+#warn $string; 
 
 done_testing; 
