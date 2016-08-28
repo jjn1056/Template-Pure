@@ -20,7 +20,7 @@ ok my $pure = Template::Pure->new(
         'dd' => 'property',
       ],
       order_by => sub {
-        my ($hashref, $a_key, $b_key) = @_;
+        my ($pure, $hashref, $a_key, $b_key) = @_;
         $hashref->{$a_key} cmp $hashref->{$b_key};
       }
     },

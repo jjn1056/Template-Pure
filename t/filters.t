@@ -16,4 +16,41 @@ is Template::Pure::Filters::remove(undef, 'abcabca', 'a'), 'bcbc';
 is Template::Pure::Filters::remove(undef, 'abcabca', qr/[ac]/), 'bb';
 is Template::Pure::Filters::comma(undef, '10000'), '10,000';
 
+use Template::Pure;
+use Mojo::DOM58;
+
+ok my $html = q[
+  <html>
+    <head>
+      <title>Page Title</title>
+    </head>
+    <body>
+      <input id='one' type='checkbox'>
+      <input id='two' type='checkbox'>
+    </body>
+  </html>
+];
+
+ok my $pure = Template::Pure->new(
+  template=>$html,
+  directives=> [
+    '#one@checked' => 'checkbox1 |cond("on", undef)',
+    '#two@checked' => 'checkbox2 |cond("on", undef)',
+
+  ],    
+);
+
+ok my $data = +{
+  checkbox1=>'1',
+  checkbox2=>'0',
+};
+
+ok my $string = $pure->render($data);
+ok my $dom = Mojo::DOM58->new($string);
+
+#warn $string;
+
+ok $dom->at('#one')->attr('checked');
+ok ! $dom->at('#two')->attr('checked');
+
 done_testing;

@@ -1,7 +1,23 @@
 The following logs changes for the CPAN distribution Template::Pure
 
-0.027   TBD
-        -
+0.027   28 August 2016
+        - Fixed bug in data path specifications with placeholders that caused the
+          final character to be deleted in some cases.
+        - !!BREAKING CHANGE!!: On iterator, the special key 'filter' is now 'grep', to
+          match inconsistent docs.  Special key 'grep' does what 'filter' used to do
+          which is to allow or skip a row in the iterator based on some logic.  However
+          we also have now in addition to the new 'grep' a new 'filter', which is used
+          to filter or transform the iterator row in some way.  Docs and tests updated.
+          Should be a simple search and replace for you if you are using iterators with
+          the old 'filter' keyword.
+        - !!BREAKING CHANGE!!  We documented the old 'filter' (now 'grep') iterator
+          keyword to say that the anonymous subroutine received the $pure object as its
+          first argument.  This was not the case.  Code has been fixed to match the
+          documented behavior, but if you relied on the previous code you will need to
+          make some minor changes.
+        - New Filter: 'cond'.  Basically a filter tha works like the conditional operator
+          (?).  See docs.  Added this to save myself having to drop to a coderef so much.
+        - Test case around when you want to match several specs to a single action.
 
 0.026   25 August 2016
         - Fixed bug where in a loop and using a prepend or append match specification

@@ -54,8 +54,23 @@ sub parse_data_template {
   )}x;
 
   my @parts;
+
+  # TODO Regexp hack info.  Ok so maybe my regexp Foo is not as good as it
+  # could be... The problem I have is that ( [^={]+ ) capture = and { not both
+  # grouped together.  I can't seem to get it working right with things like
+  # (?!\=\{)+ that just never seems to pass tests.  Since '=' is very common in
+  # HTML tags (like for setting attributes) matching on = is probably not my best
+  # idea.  For now there's a hack here to change m/=./ into !\1! and then I revert
+  # it.  That obviously sucks and wastes performance as well.  I'm leaving it like
+  # this for now but someone with awesome regexp foo I hope can help me out :)
+
+  $spec=~s/\=([^{])/\!$1\!/g; #TODO Hack step1
+
   while($spec =~/( [^={]+ ) | $placeholder /gx) {
     my $part = $1||$2;
+
+    $part=~s/\!(.)+\!/\=$1/g; #TODO Hack step2
+
     if(my ($is_data_spec) = ($part=~/^$opentag(.+?)$closetag$/)) {
       push @parts, +{ parse_data_spec($is_data_spec) };
     } else {

@@ -12,6 +12,8 @@ ok my $html = q[
       <p id="footer">...</p>
       <p id="last">...</p>
       <p id="bug1">...</p>
+      <p id="bug2">...</p>
+
     </body>
   </html>
 ];
@@ -23,6 +25,7 @@ ok my $pure = Template::Pure->new(
     '#footer' => '={meta.title} on ={meta.date} | upper',
     '#last' => '={meta.title} is the title | upper',
     '#bug1' => '={meta.date}/delete',
+    '#bug2' => '<a href="fff">={meta.date}</a> | encoded_string',
 
 ]);
 
@@ -44,5 +47,6 @@ is $dom->at('#story ')->content, 'INNER STUFF: XXXXXXXXXXXXXXXXXXXX on 1/1/2020'
 is $dom->at('#footer')->content, 'INNER STUFF ON 1/1/2020';
 is $dom->at('#last')->content, 'INNER STUFF IS THE TITLE';
 is $dom->at('#bug1')->content, '1/1/2020/delete';
+is "${\$dom->at('#bug2')->content}", '<a href="fff">1/1/2020</a>';
 
 done_testing; 

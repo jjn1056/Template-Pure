@@ -30,6 +30,7 @@ sub all {
     rtrim => \&rtrim,
     trim => \&trim,
     default => \&default,
+    cond => \&cond,
   );
 }
 
@@ -75,6 +76,10 @@ sub dump {
   return $value;
 }
 
+sub cond {
+  my ($template, $check, $if_true, $if_false) = @_;
+  return $check ? $if_true : $if_false;
+}
 sub uri_escape {
   my ($template, $data, $unsafe) = @_;
   if($unsafe) {
@@ -405,6 +410,20 @@ Removes all whitespace from either the right side, left side, or both sides of t
 =head2 comma
 
 Given a data value which is a number, comma-fy it for readability (100000 = > 100,000).
+
+=head2 cond
+
+A filter that is like the conditional operator (?).  Takes two arguments and returns the
+first one if the filtered value is true and the second one otherwise.
+
+    my $pure = Template::Pure->new(
+      template=>q[
+        <input name='toggle' type='checkbox'>
+      ],
+      directives=> [
+        'input[name="toggle"]@checked' => 'checkbox_is_set |cond("on", undef)',
+      ],    
+    );
 
 =head1 SEE ALSO
  

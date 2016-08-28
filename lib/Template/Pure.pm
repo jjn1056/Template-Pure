@@ -263,6 +263,7 @@ sub _process_dom_recursive {
       $directive->($self, $dom, $data); 
       next;
     }
+
     if($directive =~/\=\{/g) {
       $directive = join '', map {
         ref $_ eq 'HASH' ? $self->_value_from_data($data, %$_) : $_; 
@@ -464,6 +465,7 @@ sub _process_sub_data {
   
   # Pull out any sort or filters
   my $sort_cb = exists $action{order_by} ? delete $action{order_by} : undef;
+  my $grep_cb = exists $action{grep} ? delete $action{grep} : undef;
   my $filter_cb = exists $action{filter} ? delete $action{filter} : undef;
   my $display_fields = exists $action{display_fields} ? delete $action{display_fields} : undef;
   my $following_directives = exists $action{directives} ? delete $action{directives} : undef;
@@ -496,7 +498,13 @@ sub _process_sub_data {
       $options{display_fields} = $display_fields;
     }
 
-    my $iterator = Template::Pure::Iterator->from_proto($itr_data_proto, $sort_cb, $filter_cb, \%options);
+    $options{sort} = $sort_cb if $sort_cb;
+    $options{grep} = $grep_cb if $grep_cb;
+    $options{filter} = $filter_cb if $filter_cb;
+    $options{display_fields} = $display_fields if $display_fields;
+
+
+    my $iterator = Template::Pure::Iterator->from_proto($itr_data_proto, $self, \%options);
     
     if($css eq '.') {
       $self->_process_iterator($dom, $new_key, $iterator, @{$sub_data_action});
@@ -1534,7 +1542,7 @@ Returns all the items in the iterator
 
 =back
 
-=head3 Sorting and filtering a Loop
+=head3 Sorting a Loop
 
 You may provide a custom anonymous subroutine to provide a display
 specific order to your loop.  For simple values such as Arrayrefs
@@ -1558,7 +1566,7 @@ and hashrefs this is simple:
             '.last-name' => 'name.last',
           ],
           'order_by' => sub {
-            my ($hashref, $a, $b) = @_;
+            my ($pure, $hashref, $a, $b) = @_;
             return $a->{last} cmp $b->{last};
           },
         },
@@ -1593,7 +1601,7 @@ Results in:
     </ol>
 
 So you have a key 'order_by' at the same level as the loop action declaration
-which is an anonynous subroutine that takes three arguments, the first being
+which is an anonynous subroutine that takes four arguments; the $pure object,
 a reference to the data you are sorting (an arrayref or hashref)
 followed by the $a and $b items to be compared for example as in:
 
@@ -1604,23 +1612,23 @@ we allow for the object to provide a sort method based on its internal needs.
 For example if you have a L<DBIx::Class::Resultset> as your iterator, you may
 wish to order your display at the database level:
 
-    'sort' => sub {
-      my ($object) = @_;
+    'order_by' => sub {
+      my ($pure, $object) = @_;
       return $object->order_by_last_name;
     },
 
-We recommend avoiding implimentation specific details when possible (for example
+We recommend avoiding implementation specific details when possible (for example
 in L<DBIx::Class> use a custom resultset method, not a ->search query.).
 
-=head3 Perform a 'filter' on your loop items
+=head3 Perform a 'grep' on your loop items
 
 You may wish for the purposes of display to skip items in your loop.  Similar to
 'order_by', you may create a 'grep' key that returns either true or false to determine
 if an item in the loop is allowed (works like the 'grep' function).
 
     # Only show items where the value is greater than 10.
-    'filter' => sub {
-      my ($template, $item) = @_;
+    'grep' => sub {
+      my ($pure, $item) = @_;
       return $item > 10; 
     },
 
@@ -1629,9 +1637,33 @@ object as the argument and are expected to return a new iterator that is properl
 filtered:
 
     'grep' => sub {
-      my ($template, $iterator) = @_;
+      my ($pure, $iterator) = @_;
       return $iterator->only_over_10;
     },
+
+=head3 Perform a 'filter' on your loop items
+
+Lastly you may wish for the purposes of display to perform so sort of tranformation
+on the loop item.  For example you may wish rename fields or to flatten a
+L<DBIx::Class> result from an object to a hashref in order to prevent your template
+authors from accidentally modifying th database.  In this case you may add a hash
+key 'filter' in the same way as you did with 'sort' or 'grep', which is an anonymous
+subroutine that gets the template object followed by the interator item reference (or
+scalar). You must return a new reference (or scalar).  Example:
+
+    'filter' => sub {
+      my ($pure, $item) = @_;
+      return + {
+        fullname => $item->first_name .' '. $item->last_name,
+        age => $item->age,
+      };
+    },
+
+Recommendation is to keep this as simple as possible rather than to do very heavy
+rewriting of the data structure.
+
+B<NOTE> Should you have more than one special key on your iterator loop, the keys are
+processed in the following order 'filter', 'grep', 'order_by'.
 
 =head3 Generating display_fields
 

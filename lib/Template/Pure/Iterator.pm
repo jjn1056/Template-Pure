@@ -9,17 +9,24 @@ package Template::Pure::Iterator;
 use Scalar::Util 'blessed';
 
 sub from_proto {
-  my ($class, $proto, $sort_cb, $filter_cb, $options) = @_;
+  my ($class, $proto, $pure, $options) = @_;
+  my $sort_cb = delete $options->{'sort'};
+  my $grep_cb = delete $options->{'grep'};
+  my $filter_cb = delete $options->{'filter'};
+
+  #sorry about this mess but I don't have time for a total redo right now
+  $options->{pure} = $pure;
+
   if(blessed $proto) {
-    return $class->from_object($proto, $sort_cb, $filter_cb, $options);
+    return $class->from_object($proto, $filter_cb, $grep_cb, $sort_cb, $options);
   } else {
     my $type = 'from_' .lc ref $proto;
-    return $class->$type($proto, $sort_cb, $filter_cb, $options);
+    return $class->$type($proto, $filter_cb, $grep_cb, $sort_cb, $options);
   }
 }
 
 sub from_object {
-  my ($class, $obj, $sort_cb, $filter_cb, $options) = @_;
+  my ($class, $obj, $filter_cb, $grep_cb, $sort_cb, $options) = @_;
   my ($index, $current) = (0);
  
   if(
@@ -29,8 +36,9 @@ sub from_object {
     (my $count = $obj->can('count'))
   ) {
 
-    $obj = $filter_cb->($obj) if defined $filter_cb;
-    $obj = $sort_cb->($obj) if defined $sort_cb;
+    $obj = $filter_cb->($options->{pure}, $obj) if defined $filter_cb;
+    $obj = $grep_cb->($options->{pure}, $obj) if defined $grep_cb;
+    $obj = $sort_cb->($options->{pure}, $obj) if defined $sort_cb;
 
     return bless +{
       _index => sub { return $index },
@@ -61,22 +69,29 @@ sub from_object {
       %hash =  %{$obj};
     }
 
-    return $class->from_hash(\%hash, $sort_cb, $filter_cb);
+    return $class->from_hash(\%hash, $filter_cb, $grep_cb, $sort_cb, $options);
   }
 
 }
 
 sub from_hash {
-  my ($class, $hashref, $sort_cb, $filter_cb) = @_;
-  my @keys = defined $filter_cb ? grep { $filter_cb->($_, $hashref->{$_}) ? $_ : undef } keys %$hashref : keys %$hashref;
+  my ($class, $hashref, $filter_cb, $grep_cb, $sort_cb, $options) = @_;
+
+  my %hash = defined $filter_cb ?
+    map { $filter_cb->($options->{pure}, $_, $hashref->{$_}) } keys %{$hashref} :
+      %{$hashref};
+  
+  my @keys = defined $grep_cb ?
+    grep { $grep_cb->($options->{pure}, $_, $hash{$_}) ? $_ : undef } keys %hash : 
+    keys %hash;
 
   if(defined $sort_cb) {
-    @keys = sort { $sort_cb->($hashref, $a, $b) } @keys;
+    @keys = sort { $sort_cb->($options->{pure},\%hash, $a, $b) } @keys;
   }
 
   my $index = 0;
   my $current;
-  my $current_key = $hashref->{$keys[0]};
+  my $current_key = $hash{$keys[0]};
   return bless +{
     _index => sub { return $current_key },
     _current_value => sub { return $current },
@@ -85,13 +100,13 @@ sub from_hash {
     _next => sub {
       return undef if $index > $#keys;
       $current_key = $keys[$index];
-      my $value = $hashref->{$current_key};
+      my $value = $hash{$current_key};
       $index++;
       $current = $value;
       return $value;
     },
     _reset => sub { $index = 0 },
-    _all => sub { return %{$hashref} },
+    _all => sub { return %hash },
     _is_first => sub { return $index-1 == 0 ? 1:0 },
     _is_last => sub { return $index-1 == $#keys ? 1:0 },
     _is_even => sub { return $index % 2 ? 0:1 },
@@ -100,11 +115,17 @@ sub from_hash {
 }
 
 sub from_array {
-  my ($class, $arrayref, $sort_cb, $filter_cb) = @_;
-  my @array = defined $filter_cb ? grep { $filter_cb->($_) } @$arrayref : @$arrayref;
+  my ($class, $arrayref, $filter_cb, $grep_cb, $sort_cb, $options) = @_;
+  my @array = defined $filter_cb ?
+    map { $filter_cb->($options->{pure}, $_) } @$arrayref :
+      @$arrayref;
+
+  if(defined $grep_cb) {
+    @array = grep { $grep_cb->($options->{pure}, $_) ? $_ : undef } @array;
+  }
 
   if(defined $sort_cb) {
-    @array = sort { $sort_cb->($arrayref, $a, $b) } @array;
+    @array = sort { $sort_cb->($options->{pure}, $arrayref, $a, $b) } @array;
   }
 
   my $index = 0;

@@ -36,11 +36,11 @@ ok my $pure = Template::Pure->new(
           truncate(={/settings.length}) } ={i.index}',
       ],
       'order_by' => sub {
-        my ($data, $a, $b) = @_;
+        my ($pure, $data, $a, $b) = @_;
         return $b cmp $a;
       },
-      'filter' => sub {
-        return $_[0] =~m/ja/;
+      'grep' => sub {
+        return $_[1] =~m/ja/;
       },
     },
   ],    
@@ -64,5 +64,7 @@ ok !$dom->find('ul li')->[3];
 is $dom->find('ol li')->[0]->content, 'JANEJANEJA 1';
 is $dom->find('ol li')->[1]->content, 'JACKJACKJA 2';
 ok !$dom->find('ol li')->[3];
+
+warn $string; 
 
 done_testing; 
