@@ -1,6 +1,6 @@
 The following logs changes for the CPAN distribution Template::Pure
 
-0.028   TBD
+0.028   31 August 2016
        - If your match specification does not match anything in the template, you now
          get an error.
        - The iterator modifiers filter, grep, order_by can now take a scalar that is
