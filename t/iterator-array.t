@@ -39,9 +39,7 @@ ok my $pure = Template::Pure->new(
         my ($pure, $data, $a, $b) = @_;
         return $b cmp $a;
       },
-      'grep' => sub {
-        return $_[1] =~m/ja/;
-      },
+      'grep' => 'callbacks.grep',
     },
   ],    
 );
@@ -51,6 +49,11 @@ ok my $data = +{
     length => 10,
   },
   people => [qw/john jack jane/],
+  callbacks => {
+    'grep' => sub {
+      return $_[1] =~m/ja/;
+    },
+  }
 };
 
 ok my $string = $pure->render($data);

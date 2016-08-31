@@ -113,9 +113,10 @@ sub _process_pi {
   } elsif($target eq 'pure-overlay') {
     $params{node}->following('*')->first->attr('data-pure-overlay-id'=>"overlay-$params{cnt}");
     $params{node}->remove;
+
     push @{$params{directives}}, (
       "^*[data-pure-overlay-id=overlay-$params{cnt}]", [ +{%attrs, src=>$src }, '^.' => 'src'],
-      "*[data-pure-overlay-id=overlay-$params{cnt}]\@data-pure-overlay-id", sub { undef },
+      #  "*[data-pure-overlay-id=overlay-$params{cnt}]\@data-pure-overlay-id", sub { undef },
     );
   } else {
     warn "Encountering processing instruction $target that I can't process";
@@ -247,6 +248,13 @@ sub at_or_die {
   return $new;
 }
 
+sub find_or_die {
+  my ($self, $dom, $css) = @_;
+  my $collection = $dom->find($css);
+  die "Match specification '$css' produces no nodes on $dom" unless $collection->size;
+  return $collection;
+}
+
 sub _process_dom_recursive {
   my ($self, $data_proto, $dom, @directives) = @_;
 
@@ -317,7 +325,7 @@ sub _process_obj {
       my $value = $self->_value_from_template_obj($dom, $data, $obj, %match_spec);
       $self->_process_mode($dom, $value, %match_spec);
     } else {
-      my $collection = $dom->find($css);
+      my $collection = $self->find_or_die($dom,$css);
       $collection->each(sub {
 
         my $content;
@@ -343,7 +351,7 @@ sub _process_obj {
       my $value = $obj->TO_HTML($self, $dom, $data->value);
       $self->_process_mode($dom, $value, %match_spec);
     } else {
-      my $collection = $dom->find($css);
+      my $collection = $self->find_or_die($dom,$css);;
       $collection->each(sub {
         my $value = $obj->TO_HTML($self, $_, $data->value);
         $self->_process_mode($_, $value, %match_spec);
@@ -417,18 +425,21 @@ sub _process_code {
   my ($self, $dom, $data, $code, %match_spec) = @_;
   my $css = $match_spec{css};
   if($css eq '.') {
-    my $value = $code->($self, $dom, $data->value);
-    #$self->_process_mode($dom, $value, %match_spec);
+    my $value = $self->_call_coderef($code, $dom, $data->value);
     $self->_process_value_proto($dom, $data, $value, %match_spec);
   } else {
-    my $collection = $dom->find($css);
+    my $collection = $self->find_or_die($dom,$css);
     $collection->each(sub {
-      my $value = $code->($self, $_, $data->value);
-      #$self->_process_mode($_, $value, %match_spec);
+      my $value = $self->_call_coderef($code, $_, $data->value);
       my %local_match_spec = (%match_spec, css=>'.');
       $self->_process_value_proto($_, $data, $value, %local_match_spec);
     });
   }
+}
+
+sub _call_coderef {
+  my ($self, $code, $dom, $value) = @_;
+  return $self->$code($dom, $value);
 }
 
 sub _value_from_template_obj {
@@ -498,18 +509,42 @@ sub _process_sub_data {
       $options{display_fields} = $display_fields;
     }
 
-    $options{sort} = $sort_cb if $sort_cb;
-    $options{grep} = $grep_cb if $grep_cb;
-    $options{filter} = $filter_cb if $filter_cb;
-    $options{display_fields} = $display_fields if $display_fields;
+    if($sort_cb) {
+      if(ref(\$sort_cb) eq 'SCALAR') {
+        my %sub_data_spec = $self->parse_data_spec($sort_cb);  
+        my $value = $self->_value_from_data($data, %sub_data_spec);
+        $sort_cb = $value;
+      }
+      die "the 'sort' key must point to an anonymous subroutine" unless ref($sort_cb) eq 'CODE';
+      $options{sort} = $sort_cb;
+    }
+    if($grep_cb) {
+      if(ref(\$grep_cb) eq 'SCALAR') {
+        my %sub_data_spec = $self->parse_data_spec($grep_cb);  
+        my $value = $self->_value_from_data($data, %sub_data_spec);
+        $grep_cb = $value;
+      }
+      die "the 'grep' key must point to an anonymous subroutine" unless ref($grep_cb) eq 'CODE';
+      $options{grep} = $grep_cb;
+    }
+    if($filter_cb) {
+      if(ref(\$filter_cb) eq 'SCALAR') {
+        my %sub_data_spec = $self->parse_data_spec($filter_cb);  
+        my $value = $self->_value_from_data($data, %sub_data_spec);
+        $filter_cb = $value;
+      }
+      die "the 'sort' key must point to an anonymous subroutine" unless ref($filter_cb) eq 'CODE';
+      $options{filter} = $filter_cb;
+    }
 
+    $options{display_fields} = $display_fields if $display_fields;
 
     my $iterator = Template::Pure::Iterator->from_proto($itr_data_proto, $self, \%options);
     
     if($css eq '.') {
       $self->_process_iterator($dom, $new_key, $iterator, @{$sub_data_action});
     } else {
-      my $collection = $dom->find($css);
+      my $collection = $self->find_or_die($dom,$css);
       $collection->each(sub {
         $self->_process_iterator($_, $new_key, $iterator, @{$sub_data_action});
       });
@@ -562,7 +597,7 @@ sub process_sub_directives {
   if($css eq '.') {
     $self->_process_dom_recursive($data, $dom, @directives);
   } else {
-    my $collection = $dom->find($css);
+    my $collection = $self->find_or_die($dom,$css);
     $collection->each(sub {
         $self->_process_dom_recursive($data, $_, @directives);
     });
@@ -617,7 +652,7 @@ sub _process_dom_filter {
   if($css eq '.') {
     $cb->($self, $dom, $data);
   } else {
-    my $collection = $dom->find($css);
+    my $collection = $self->find_or_die($dom,$css);
     $collection->each(sub {
       $cb->($self, $_, $data);
     });
@@ -629,7 +664,7 @@ sub _process_match_spec {
   if($match_spec{css} eq '.') {
     $self->_process_mode($dom, $value, %match_spec);
   } else {
-    my $collection = $dom->find($match_spec{css});
+    my $collection = $self->find_or_die($dom,$match_spec{css});
     $collection->each(sub {
       $self->_process_mode($_, $value, %match_spec);
     });
@@ -1620,6 +1655,10 @@ wish to order your display at the database level:
 We recommend avoiding implementation specific details when possible (for example
 in L<DBIx::Class> use a custom resultset method, not a ->search query.).
 
+B<NOTE:> if you need more dynamic control over the way sorting works, you can instead
+of hard coding an anonymous subroutine, instead use a string that is a path on the
+current data context to an subroutine reference.
+
 =head3 Perform a 'grep' on your loop items
 
 You may wish for the purposes of display to skip items in your loop.  Similar to
@@ -1641,6 +1680,10 @@ filtered:
       return $iterator->only_over_10;
     },
 
+B<NOTE:> if you need more dynamic control over the way grep works, you can instead
+of hard coding an anonymous subroutine, instead use a string that is a path on the
+current data context to an subroutine reference.
+
 =head3 Perform a 'filter' on your loop items
 
 Lastly you may wish for the purposes of display to perform so sort of tranformation
@@ -1661,6 +1704,10 @@ scalar). You must return a new reference (or scalar).  Example:
 
 Recommendation is to keep this as simple as possible rather than to do very heavy
 rewriting of the data structure.
+
+B<NOTE:> if you need more dynamic control over the way filtering works, you can instead
+of hard coding an anonymous subroutine, instead use a string that is a path on the
+current data context to an subroutine reference.
 
 B<NOTE> Should you have more than one special key on your iterator loop, the keys are
 processed in the following order 'filter', 'grep', 'order_by'.

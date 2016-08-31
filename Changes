@@ -1,5 +1,11 @@
 The following logs changes for the CPAN distribution Template::Pure
 
+0.028   TBD
+       - If your match specification does not match anything in the template, you now
+         get an error.
+       - The iterator modifiers filter, grep, order_by can now take a scalar that is
+         a path to an anonymous subroutine on the data context.
+
 0.027   28 August 2016
         - Fixed bug in data path specifications with placeholders that caused the
           final character to be deleted in some cases.
