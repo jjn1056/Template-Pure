@@ -47,9 +47,9 @@ sub from_object {
       _count => sub { return $obj->$count },
       _next => sub {
         if(my $next = $obj->$next) {
-          $current = \$next;
+          $current = $next;
           $index++;
-          return $next;
+          return \$next;
         } else {
           return undef;
         }

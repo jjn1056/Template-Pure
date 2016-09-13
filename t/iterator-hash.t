@@ -40,7 +40,7 @@ ok my %data = (
 ok my $string = $pure->render(\%data);
 ok my $dom = Mojo::DOM58->new($string);
 
-warn $string;
+#warn $string;
 
 is $dom->find('section')->[0]->at('dt')->content, 'aaa';
 #is $dom->find('section')->[0]->at('dd')->content, 'bbb';

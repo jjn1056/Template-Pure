@@ -3,7 +3,7 @@ use warnings;
 
 package Template::Pure;
 
-our $VERSION = '0.029';
+our $VERSION = '0.030';
 
 use Mojo::DOM58;
 use Scalar::Util;
