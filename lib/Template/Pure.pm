@@ -3,7 +3,7 @@ use warnings;
 
 package Template::Pure;
 
-our $VERSION = '0.028';
+our $VERSION = '0.029';
 
 use Mojo::DOM58;
 use Scalar::Util;
@@ -575,6 +575,7 @@ sub _process_iterator {
   my ($self, $dom, $key, $iterator, @actions) = @_;
   my $template = dclone($dom);
   while(my $datum = $iterator->next) {
+    $datum = $$datum;
     my $new_dom = Mojo::DOM58->new($template);
     my $new_data;
     if($key eq '.') {

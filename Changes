@@ -1,5 +1,8 @@
 The following logs changes for the CPAN distribution Template::Pure
 
+0.029   12 September 2016
+       - Fixed a bug when the value returned by an iterator is undef
+
 0.028   31 August 2016
        - If your match specification does not match anything in the template, you now
          get an error.

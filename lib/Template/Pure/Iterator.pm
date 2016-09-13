@@ -47,7 +47,7 @@ sub from_object {
       _count => sub { return $obj->$count },
       _next => sub {
         if(my $next = $obj->$next) {
-          $current = $next;
+          $current = \$next;
           $index++;
           return $next;
         } else {
@@ -91,7 +91,7 @@ sub from_hash {
 
   my $index = 0;
   my $current;
-  my $current_key = $hash{$keys[0]};
+  my $current_key = $keys[$index];
   return bless +{
     _index => sub { return $current_key },
     _current_value => sub { return $current },
@@ -103,7 +103,7 @@ sub from_hash {
       my $value = $hash{$current_key};
       $index++;
       $current = $value;
-      return $value;
+      return \$value;
     },
     _reset => sub { $index = 0 },
     _all => sub { return %hash },
@@ -140,7 +140,7 @@ sub from_array {
       my $value = $array[$index];
       $index++;
       $current = $value;
-      return $value;
+      return \$value;
     },
     _reset => sub { $index = 0 },
     _all => sub { return @array },
