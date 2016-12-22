@@ -222,13 +222,25 @@ sub process_dom {
 }
 
 sub default_filters { Template::Pure::Filters->all }
-sub parse_match_spec { Template::Pure::ParseUtils::parse_match_spec($_[1]) }
-sub parse_data_spec { Template::Pure::ParseUtils::parse_data_spec($_[1]) }
-sub parse_data_template { Template::Pure::ParseUtils::parse_data_template($_[1]) }
-sub parse_processing_instruction { Template::Pure::ParseUtils::parse_processing_instruction($_[1]) }
-sub parse_itr_spec { Template::Pure::ParseUtils::parse_itr_spec($_[1]) } 
 sub escape_html { Template::Pure::Filters::escape_html($_[1]) }
 sub encoded_string { Template::Pure::EncodedString->new($_[1]) }
+
+my %match_specs = ();
+sub parse_match_spec { return %{ $match_specs{$_[1]} ||= +{Template::Pure::ParseUtils::parse_match_spec($_[1])} } }
+
+my %data_specs = ();
+sub parse_data_spec { return %{ $data_specs{$_[1]} ||= +{Template::Pure::ParseUtils::parse_data_spec($_[1])} } }
+
+my %data_templates = ();
+sub parse_data_template { return @{ $data_templates{$_[1]} ||= [Template::Pure::ParseUtils::parse_data_template($_[1])] } }
+
+my %processing_instruction_specs = ();
+sub parse_processing_instruction {
+  return @{ $processing_instruction_specs{$_[1]} ||= [Template::Pure::ParseUtils::parse_processing_instruction($_[1])] };
+}
+
+my %itr_specs = ();
+sub parse_itr_spec { return %{ $itr_specs{$_[1]} ||= +{Template::Pure::ParseUtils::parse_itr_spec($_[1])} } }
 
 sub data_at_path {
   my ($self, $data, $path) = @_;

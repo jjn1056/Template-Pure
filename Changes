@@ -5,6 +5,8 @@ The following logs changes for the CPAN distribution Template::Pure
          instance.
        - When loop is assigning directly to a datapath, respect existing scope
          on the CSS match.
+        - Memoize most of the parsing, should be a speed boost for repeated
+          renders on the same template.
 
 0.030   13 September 2016
        - Fixed regression in interator introduced by last release
