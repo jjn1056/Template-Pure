@@ -1,5 +1,8 @@
 The following logs changes for the CPAN distribution Template::Pure
 
+0.032   22 December 2016
+       - Fixed distribution metadata that prevented correct installation :(
+
 0.031   22 December 2016
        - Allow a loop to assign directly to a coderef or another Template::Pure
          instance.
