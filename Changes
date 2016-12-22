@@ -1,5 +1,11 @@
 The following logs changes for the CPAN distribution Template::Pure
 
+0.031   22 December 2016
+       - Allow a loop to assign directly to a coderef or another Template::Pure
+         instance.
+       - When loop is assigning directly to a datapath, respect existing scope
+         on the CSS match.
+
 0.030   13 September 2016
        - Fixed regression in interator introduced by last release
 

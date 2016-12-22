@@ -480,18 +480,39 @@ sub _process_sub_data {
   my $filter_cb = exists $action{filter} ? delete $action{filter} : undef;
   my $display_fields = exists $action{display_fields} ? delete $action{display_fields} : undef;
   my $following_directives = exists $action{directives} ? delete $action{directives} : undef;
-
   my ($sub_data_proto, $sub_data_action) = %action;
 
   if(index($sub_data_proto,'<-') > 0) {
 
     if(ref \$sub_data_action eq 'SCALAR') {
-      $sub_data_action = [ '.' => $sub_data_action ];
+      my $new_match_spec = '.';
+      $new_match_spec = "+$new_match_spec" if $match_spec->{mode} eq 'append';
+      $new_match_spec = "$new_match_spec+" if $match_spec->{mode} eq 'prepend';
+      $new_match_spec = "$new_match_spec|" if $match_spec->{mode} eq 'filter';
+      $new_match_spec = "^$new_match_spec" if $match_spec->{target} eq 'node';
+      $sub_data_action = [ $new_match_spec => $sub_data_action ];
+    }
+
+    if(ref $sub_data_action eq 'CODE') {
+      my $new_match_spec = '.';
+      $new_match_spec = "+$new_match_spec" if $match_spec->{mode} eq 'append';
+      $new_match_spec = "$new_match_spec+" if $match_spec->{mode} eq 'prepend';
+      $new_match_spec = "$new_match_spec|" if $match_spec->{mode} eq 'filter';
+      $new_match_spec = "^$new_match_spec" if $match_spec->{target} eq 'node';
+      $sub_data_action = [ $new_match_spec => $sub_data_action ];
+    }
+
+    if(Scalar::Util::blessed($sub_data_action)) {
+      my $new_match_spec = '.';
+      $new_match_spec = "+$new_match_spec" if $match_spec->{mode} eq 'append';
+      $new_match_spec = "$new_match_spec+" if $match_spec->{mode} eq 'prepend';
+      $new_match_spec = "$new_match_spec|" if $match_spec->{mode} eq 'filter';
+      $new_match_spec = "^$new_match_spec" if $match_spec->{target} eq 'node';
+      $sub_data_action = [ $new_match_spec => $sub_data_action ];
     }
 
     die "Action for '$sub_data_proto' must be an arrayref of new directives"
       unless ref $sub_data_action eq 'ARRAY';
-
 
     my ($new_key, $itr_data_spec) = $self->parse_itr_spec($sub_data_proto);
     my $itr_data_proto = $self->_value_from_data($data, %$itr_data_spec);
@@ -1781,8 +1802,8 @@ Returns:
 =head3 Shortcuts on Loops
 
 If you are doing a simple loop where the match specification is the current
-match point in the DOM and you are doing a simple 'replace contents' you may
-use a scalar instead of an arrayref:
+match point in the DOM and there is only going to be one modification you
+can just use a scalar data context path for your action:
 
     my $html = qq[
       <ol>
@@ -1798,12 +1819,66 @@ use a scalar instead of an arrayref:
         },
       ]);
 
+You can also use a coderef in the same way:
+
+    my $pure = Template::Pure->new(
+      template => $html,
+      directives => [
+        'ol li' => {
+          'task<-tasks' => sub {
+            my ($pure, $dom, $data) = @_;
+            $pure->data_at_path($data, 'task');
+          }
+        }
+      ]);
+
+Both the above would return output like the following:
+
     my %data = (
       tasks => [
         'Walk Dogs',
         'Buy Milk',
       ],
     );
+
+    my $string = $pure->render(\%data);
+
+    <ol>
+      <li>Walk Dogs</li>
+      <li>Buy Milk</li>
+    </ol>
+
+Finally you can use an object that is another L<Template::Pure> instance
+in which class it will ack as a wrapper on the matched DOM:
+
+  my $pure = Template::Pure->new(
+    template => q[
+      <ol>
+        <li>Items</li>
+      </ol>
+    ],
+    directives => [
+      '^ol li' => {
+        'task<-tasks' => Template::Pure->new(
+          template => q[<span></span>],
+          directives => [
+            'span' => 'task',
+            '.' => [
+              { inner => \'^span', content => 'content' },
+              '.' => 'content',
+              'li+' => 'inner',
+            ],
+          ],
+        ),
+      }
+    ]);
+
+Produces:
+
+      <ol>
+        <li>Items<span>Walk Dogs</span></li>
+        <li>Items<span>Buy Milk</span></li>
+      </ol>
 
 =head2 Object - Set the match value to another Pure Template
 
