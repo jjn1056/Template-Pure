@@ -3,7 +3,7 @@ use warnings;
 
 package Template::Pure;
 
-our $VERSION = '0.032';
+our $VERSION = '0.033';
 
 use Mojo::DOM58;
 use Scalar::Util;
@@ -323,6 +323,10 @@ sub _process_value_proto {
     $self->_process_obj($dom, $data, $value_proto, %match_spec);
   } elsif((ref($value_proto)||'') eq 'CODE') {
     $self->_process_code($dom, $data, $value_proto, %match_spec);
+  } elsif( (ref($value_proto)||'') eq 'ARRAY') {
+    warn "ISSSSSS" x 10;
+    use Devel::Dwarn;Dwarn $value_proto;
+    $self->process_sub_directives($dom, $data->value, $match_spec{css}, @{$value_proto});
   } else {
     $self->_process_match_spec($dom, $value_proto, %match_spec);
   }
@@ -3071,7 +3075,7 @@ the code and it seems not active.  Might be worth looking at at least for ideas!
  
 =head1 COPYRIGHT & LICENSE
  
-Copyright 2016, John Napiorkowski L<email:jjnapiork@cpan.org>
+Copyright 2017, John Napiorkowski L<email:jjnapiork@cpan.org>
  
 This library is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.

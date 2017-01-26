@@ -40,6 +40,13 @@ BEGIN {
     };
   }
 
+  sub array {
+    my $self = shift;
+    return [
+      'title+' => 'self.version'
+    ];
+  }
+
 }
 
 ok my $html_template = qq[
@@ -65,6 +72,7 @@ ok my $pure = Local::Template::Pure::Custom->new(
     '#main' => 'story',
     '#foot' => 'self.time',
     '#obj' => 'self.obj',
+    'head' => 'self.array',
   ]
 );
 
@@ -79,11 +87,13 @@ ok my $data = +{
 ok my $string = $pure->render($data);
 ok my $dom = Mojo::DOM58->new($string);
 
-is $dom->at('title'), '<title>A subclass</title>';
+is $dom->at('title'), '<title>A subclass100</title>';
 is $dom->at('#version')->content, '100';
 is $dom->at('#main')->content, 'XXX';
 is $dom->at('#foot')->content, 'Mon Apr 11 10:49:42 2016';
 is $dom->at('#obj')->content, 'objobjobj';
 is $dom->at('#foot')->attr('foo'), 'bar';
+
+#warn $string;
 
 done_testing;

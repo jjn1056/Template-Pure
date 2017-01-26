@@ -1,5 +1,10 @@
 The following logs changes for the CPAN distribution Template::Pure
 
+0.033   26 January 2017
+       - Copyright updates
+       - coderef data values can now return an arrayref, which will be considered
+         as subdirectives under the current DOM match point and data path.
+
 0.032   22 December 2016
        - Fixed distribution metadata that prevented correct installation :(
 
