@@ -324,6 +324,8 @@ sub _process_value_proto {
   } elsif((ref($value_proto)||'') eq 'CODE') {
     $self->_process_code($dom, $data, $value_proto, %match_spec);
   } elsif( (ref($value_proto)||'') eq 'ARRAY') {
+    warn "ISSSSSS" x 10;
+    use Devel::Dwarn;Dwarn $value_proto;
     $self->process_sub_directives($dom, $data->value, $match_spec{css}, @{$value_proto});
   } else {
     $self->_process_match_spec($dom, $value_proto, %match_spec);
