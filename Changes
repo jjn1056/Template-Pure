@@ -1,5 +1,8 @@
 The following logs changes for the CPAN distribution Template::Pure
 
+0.034   28 February 2017
+       - Infer arrayref from array in a coderef return
+
 0.033   26 January 2017
        - Copyright updates
        - coderef data values can now return an arrayref, which will be considered

@@ -29,7 +29,9 @@ sub at {
     my $key = $at->{key} || die "missing key";
     if(blessed $current) {
       if($current->can($key)) {
-        $current = $current->$key;
+        my @more;
+        ($current, @more) = $current->$key;
+        $current = [$current, @more] if @more;
       } elsif($at->{optional}) {
         $current = undef;
       } else {

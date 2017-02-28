@@ -3,7 +3,7 @@ use warnings;
 
 package Template::Pure;
 
-our $VERSION = '0.033';
+our $VERSION = '0.034';
 
 use Mojo::DOM58;
 use Scalar::Util;
@@ -306,7 +306,7 @@ sub _process_dom_recursive {
     } elsif(Scalar::Util::blessed($action_proto)) {
       $self->_process_obj($dom, $data, $action_proto, %match_spec);
     } else {
-      my $value_proto = $self->_value_from_action_proto($dom, $data, $action_proto, %match_spec);
+      my ($value_proto, @rest) = $self->_value_from_action_proto($dom, $data, $action_proto, %match_spec);
       $self->_process_value_proto($dom, $data, $value_proto, %match_spec);
     }
   }
@@ -439,12 +439,14 @@ sub _process_code {
   my ($self, $dom, $data, $code, %match_spec) = @_;
   my $css = $match_spec{css};
   if($css eq '.') {
-    my $value = $self->_call_coderef($code, $dom, $data->value);
+    my ($value, @rest) = $self->_call_coderef($code, $dom, $data->value);
+    $value = [$value, @rest] if @rest;
     $self->_process_value_proto($dom, $data, $value, %match_spec);
   } else {
     my $collection = $self->find_or_die($dom,$css);
     $collection->each(sub {
-      my $value = $self->_call_coderef($code, $_, $data->value);
+      my ($value, @rest) = $self->_call_coderef($code, $_, $data->value);
+      $value = [$value, @rest] if @rest;
       my %local_match_spec = (%match_spec, css=>'.');
       $self->_process_value_proto($_, $data, $value, %local_match_spec);
     });
